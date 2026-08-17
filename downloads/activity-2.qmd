@@ -196,7 +196,7 @@ rds_ses <- purrr::map_dfr(
                  weights = ipw, family = binomial(link = "identity"), id = id)
     
     dplyr::tibble(
-      estimator = c("Unadjusted", "Adjusted (Naive SE)", "Adjusted (Robust SE)"),
+      estimator = c("Unadjusted", "Adjusted (Known)", "Adjusted (Estimated)"),
       
       # extract risk different from the models
       rd = c(coef(unadj)[2], coef(adj_known)[2], coef(adj_gee)[2]),
@@ -206,7 +206,10 @@ rds_ses <- purrr::map_dfr(
                     sqrt(diag(vcov(adj_known)))[2], 
                     sqrt(diag(vcov(adj_gee)))[2]),
       
-
+      # # use the sandwich package to get the sandwich-based standard errors
+      # sandwich_se = c( sqrt(diag(sandwich::sandwich(unadj)))[2], 
+      #                  sqrt(diag(sandwich::sandwich(adj_known)))[2], 
+      #                  sqrt(diag(sandwich::sandwich(adj_est)))[2])
     )
   }
 )
