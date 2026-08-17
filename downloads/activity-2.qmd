@@ -1,0 +1,245 @@
+---
+title: "Slides Activity 2:"
+subtitle: "Multiple samples for the sampling distribution"
+toc: true
+toc-expand: 2
+format: html
+---
+
+# Generating multiple samples for properties of the sampling distribution
+
+We want to create 1,000 random samples of 500 people from our data generating mechanism (DGM). This allows us to understand the sampling properties and compare approaches for estimating standard error. 
+
+To do this, we need to build a function that samples from the DGM.
+
+Luckily, we can adapt the code we wrote for one sample. 
+
+## Before you begin
+
+Install the required packages.
+
+```{r}
+library(dplyr)
+library(purrr)
+library(sandwich)
+```
+
+## Step 1. Outline the specific aims.
+
+**Context:** We want to estimate the effect of prenatal vitamin supplementation on the risk of preterm birth. However, we are worried about confounding by maternal smoking, which is not measured in our data. We also want to understand implications for different approaches of standard error estimation. 
+
+**Simulation Objectives:** 
+
+1. Quantify the magnitude and direction of bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the risk of vitamin intake but increases the risk of preterm birth.
+
+2. **NEW** Compare the 95% confidence interval coverage for the risk difference using different approaches to standard error estimation, including model-based SEs and sandwich SEs. 
+
+## Step 2. Determine the appropriate data generating mechanisms.
+
+### Helper functions
+
+First, create "helper" functions we will use throughout our simulation
+
+```{r}
+# The expit function is the inverse of the log-odds. It takes in a log-odds (x), 
+# applies the inverse-logit function and returns a probability
+expit <- function(x) {
+  return(exp(x) / (1 + exp(x)))
+}
+
+# I'm also going to include the balancing intercept function in case we want to 
+# change around any parameters and it needs to be re-derived
+derive_intercept <- function(py, prob_prenatal, prob_smoke, 
+                             or_smoke, or_prenatal){
+  
+  # marginal probability of treatment
+  prob_prenatal <- prob_prenatal[1] * (1-prob_smoke) + prob_prenatal[2] * prob_smoke
+  
+  -log(1/py - 1) - or_prenatal*prob_prenatal - or_smoke*prob_smoke
+}
+
+```
+
+### Function for DGM
+
+Create a function for the DGM that we can call repeatedly. The code is near-identical to the code from the one random sample example, but adding in a derivation for the intercept. 
+
+```{r}
+dgm <- function(simid = 0,
+                n = 500, 
+                prob_smoke = 0.2,
+                prob_prenatal = c(0.95, 0.80),
+                or_prenatal = log(0.9),
+                or_smoke = log(1.5),
+                prob_preterm = 0.1){
+  
+  # Adding in a piece of code to dynamically get our intercept term. 
+  y_intercept <- derive_intercept(py = prob_preterm, 
+                                  prob_prenatal = prob_prenatal,
+                                  prob_smoke = prob_smoke,
+                                  or_smoke = or_smoke,
+                                  or_prenatal = or_prenatal)
+  dplyr::tibble(
+    # Simulation number
+    simid = simid,
+    
+    # Create 500 participants
+    id = 1:n,
+    
+    # Randomly select smoking
+    smoke = rbinom(n = n, size = 1, prob = prob_smoke),
+    
+    # Generate potential outcome under no treatment
+    preterm_x0 = rbinom(n = n, size = 1, 
+                        prob = expit(y_intercept + (or_smoke * smoke))),
+    
+    # Generate potential outcome under treatment
+    preterm_x1 = rbinom(n = n, size = 1, 
+                        prob = expit(y_intercept + (or_smoke * smoke) + or_prenatal)),
+    
+    # Generate observed treatment conditional on smoking
+    p_prenatal = prob_prenatal[smoke + 1], # probability of prenatal based on smoking
+    p_prenatal_margin = prob_prenatal[1]*(1-prob_smoke) + prob_prenatal[2]*(prob_smoke),
+    prenatal = rbinom(n = n, size = 1, prob = p_prenatal),
+    
+    # Assign actual outcome conditional on observed treatment
+    preterm = preterm_x0*(1-prenatal) + preterm_x1*(prenatal)
+  )
+  
+}
+
+```
+
+### Set the seed
+
+ALWAYS before any random number generation!
+
+```{r}
+# Set the random seed. It's good to use a relatively random starting number, not just 1234 or similar.
+set.seed(57846) 
+```
+
+### Generate the "truth"
+
+First, create a 10,000,000 person (or sufficiently large) re-sampled dataset from which to derive the truth. By doing this after setting the seed, we ensure that we use the same random state start and thus do not overlap with random states from the "observed" data. See Morris et al. 2019 for additional detail on this.
+
+```{r}
+# Random sample for estimating the truth
+truth <- dgm(n=10000000, prob_prenatal = c(0.85, 0.65), or_smoke = log(3)) # Make a sample of 10 million.
+```
+
+### Resample 1,000 times
+
+Now we want to re-sample from this DGM 1,000 times to understand the sampling behavior of our estimators. Note that we are _not_ resetting the seed with each iteration. See Morris et al. (2019) for additional detail.
+
+```{r}
+# Randomly sample 1,000 datasets of 500 people for the analysis
+# Below code creates a list of length 1,000, each entry of the list holds a sampled dataset of 500.
+data1000 <- purrr::map(.x = 1:5000, dgm, n = 500, prob_prenatal = c(0.85, 0.65), or_smoke = log(3))
+```
+
+## Step 3. Define the estimand of target of the analysis.
+
+The slides illustrate how to derive the truth mathematically. However, this is sometimes challenging to do but can be estimated from the DGM with a large n. So, I illustrate how to do that below.
+
+```{r}
+# Estimate the "true" RD using potential outcomes -- no complex analysis needed!
+true_rd <- mean(truth$preterm_x1) - mean(truth$preterm_x0)
+```
+
+## Step 4. Identify the methods to be implemented in the study.
+
+We are comparing three estimators: 
+
+1. Unweighted risk difference
+
+2. IPT weighted risk difference (known weights)
+
+3. IPT weighted risk difference (estimated weights)
+
+AND two approaches for standard error estimation:
+
+1. Model-based SEs
+
+2. Sandwich estimator for SEs
+
+### First, add known and estimated IPT weights to each of the simulation samples. 
+```{r}
+data1000 <- purrr::map(data1000, 
+                       function(x){
+                         x |> 
+                           dplyr::mutate(
+                             est_prenatal_margin = mean(prenatal)
+                           ) |> 
+                           dplyr::mutate(
+                             ipw = if_else(prenatal == 1,
+                                           p_prenatal_margin/p_prenatal, 
+                                           p_prenatal_margin/(1-p_prenatal)),
+                             ipw_est = if_else(prenatal == 1, 
+                                               est_prenatal_margin/mean(prenatal), 
+                                               (1-est_prenatal_margin)/(1-mean(prenatal))),
+                             .by = smoke
+                             )
+                         }
+                       )
+```
+
+### Now, within each sample, estimate the risk difference and standard errors for each approach. 
+```{r}
+rds_ses <- purrr::map_dfr(
+  data1000,
+  function(x){
+    unadj <- glm(preterm ~ prenatal, data = x, family = binomial(link = "identity"))
+    adj_known <- glm(preterm ~ prenatal, data = x, 
+                 weights = ipw, family = quasibinomial(link = "identity"))
+    adj_gee <- geepack::geeglm(preterm ~ prenatal, data = x, 
+                 weights = ipw, family = binomial(link = "identity"), id = id)
+    
+    dplyr::tibble(
+      estimator = c("Unadjusted", "Adjusted (Naive SE)", "Adjusted (Robust SE)"),
+      
+      # extract risk different from the models
+      rd = c(coef(unadj)[2], coef(adj_known)[2], coef(adj_gee)[2]),
+      
+      # extract the standard errors from the models
+      model_se = c(sqrt(diag(vcov(unadj)))[2], 
+                    sqrt(diag(vcov(adj_known)))[2], 
+                    sqrt(diag(vcov(adj_gee)))[2]),
+      
+
+    )
+  }
+)
+```
+
+## Step 5: Performance measures
+
+95% confidence interval coverage is equal to: 
+
+$$I(\hat{\theta}-1.96\times\hat{SE}(\hat{\theta}) \leq \theta \leq \hat{\theta}+1.96\times\hat{SE}(\hat{\theta}) )$$
+
+where $I( )$ is the indicator function ($=1$ if expression in parenthesis is true, $=0$ if false)
+
+
+### Next, calculate whether the true RD lies within the calculated confidence intervals for each sample, and calculate the difference between the estimated RD and true RD ("error") for each sample.  
+
+```{r}
+rds_ses <- rds_ses |> 
+  dplyr::mutate(
+    error = rd - true_rd,
+    model_coverage = (true_rd >= (rd - 1.96*model_se)) &  (true_rd <= (rd + 1.96*model_se))
+    #sandwich_coverage = (true_rd >= (rd - 1.96*sandwich_se)) &  (true_rd <= (rd + 1.96*sandwich_se))
+  )
+
+measures <- rds_ses |> 
+  dplyr::summarize(
+    bias = mean(error),
+    model_coverage = mean(model_coverage),
+    #sandwich_coverage = mean(sandwich_coverage), 
+    .by = estimator
+  )
+
+measures
+
+
+```

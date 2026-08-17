@@ -1,0 +1,227 @@
+[
+  {
+    "objectID": "overview.html",
+    "href": "overview.html",
+    "title": "Designing a Simulation Study",
+    "section": "",
+    "text": "Why Simulate?\nAnalytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when a nuisance parameter (like a propensity score) has to be estimated rather than known. Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we — as the analyst — know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.\nSimulation is useful whenever you need to:\n\nModel real-world random error and sampling variability\nApproximate a quantity that is hard or impossible to solve for analytically\nTest how well an estimator performs (bias, variance, confidence interval coverage) under known conditions\nUnderstand what happens when an assumption is violated (e.g., unmeasured confounding)\n\n\n\nThe ADEMP Framework\nThroughout this workshop we plan every simulation study using the ADEMP framework (Morris, White, and Crowther, Statistics in Medicine, 2019), which organizes the design of a simulation study into five components:\n\n\n\n\n\n\n\n\nLetter\nComponent\nQuestion it answers\n\n\n\n\nA\nAims\nWhat are we trying to find out?\n\n\nD\nData-generating mechanisms\nHow will we simulate data that reflects the scenario of interest?\n\n\nE\nEstimand\nWhat quantity, exactly, are we trying to estimate?\n\n\nM\nMethods\nWhich estimator(s) will we apply to the simulated data?\n\n\nP\nPerformance measures\nHow will we judge whether a method worked well?\n\n\n\nWorking through the activities on this site, you will see each of these steps made explicit — first for a single simulated sample (Activity 1), then scaled up to thousands of replicates so the performance measures (bias, confidence interval coverage) can actually be evaluated (Activity 2).\n\n\nThe Running Example\nClinical question: Does taking prenatal vitamins during pregnancy reduce the risk of preterm birth?\nThe complication: We’re worried about confounding by maternal smoking. Smoking is associated with lower use of prenatal vitamins and a higher risk of preterm birth — but suppose smoking status isn’t recorded in our data, so we can’t adjust for it directly.\n\n\n\n\n\n\n\n\n\nBecause we’re simulating this scenario rather than observing it, we get to play both analyst and omniscient narrator: we choose the true causal structure and effect sizes, generate data consistent with them, and then see how well an analysis that ignores smoking (as a real analyst — who doesn’t have this variable — would have to) recovers the truth.\nMapped onto ADEMP, the running example looks like this:\n\nAims —\n\n\n\nQuantify the bias in the estimated effect of prenatal vitamins on preterm birth when maternal smoking confounds the relationship but is unmeasured.\n\n\n\n\nCompare approaches (naive, robust) to standard error estimation.\n\n\n\nData-generating mechanism — Simulate smoking status, both potential outcomes for preterm birth (with and without vitamins), observed vitamin use conditional on smoking, and the observed outcome — see Activity 1.\nEstimand — The marginal risk difference, \\(E[Y^{x=1}] - E[Y^{x=0}]\\): the risk of preterm birth had everyone taken prenatal vitamins vs. had no one taken them.\nMethods — An unadjusted risk difference, and inverse probability of treatment weighted (IPTW) risk differences using both known and estimated weights — see Activities 1–2.\nPerformance measures — Bias (Activity 1), and 95% confidence interval coverage under model-based vs. sandwich standard errors (Activity 2).\n\n\n\nNext Steps\nHead to Activity 1 to build the data-generating mechanism for a single simulated sample.",
+    "crumbs": [
+      "Designing a Simulation Study"
+    ]
+  },
+  {
+    "objectID": "activity-3.html",
+    "href": "activity-3.html",
+    "title": "Activity 3",
+    "section": "",
+    "text": "Prefer to work locally? Download the local version — a standard .qmd file you can open in RStudio.",
+    "crumbs": [
+      "Activities",
+      "Activity 3"
+    ]
+  },
+  {
+    "objectID": "activity-3.html#coming-soon",
+    "href": "activity-3.html#coming-soon",
+    "title": "Activity 3",
+    "section": "Coming soon",
+    "text": "Coming soon\nActivity 3 will walk through planning your own simulation study using the ADEMP framework introduced in Designing a Simulation Study — starting from a research question of your choosing, through specifying a data-generating mechanism, an estimand, candidate methods, and performance measures.\nCheck back closer to the workshop date, or watch the workshop repository for updates.",
+    "crumbs": [
+      "Activities",
+      "Activity 3"
+    ]
+  },
+  {
+    "objectID": "activity-1.html",
+    "href": "activity-1.html",
+    "title": "Activity 1",
+    "section": "",
+    "text": "Prefer to work locally? Download the local version — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render. The local version uses a sample of 10,000,000 to estimate bias — the browser version is scaled down to 2,000,000 so it runs quickly here.\nIn this activity, we illustrate the key steps first for one single random sample from the data generating mechanism (DGM). Activity 2 will adapt this for 1,000 random samples.",
+    "crumbs": [
+      "Activities",
+      "Activity 1"
+    ]
+  },
+  {
+    "objectID": "activity-1.html#before-you-begin",
+    "href": "activity-1.html#before-you-begin",
+    "title": "Activity 1",
+    "section": "Before you begin",
+    "text": "Before you begin\nThe packages below are pre-installed for this page. Run this chunk to load them into your session.",
+    "crumbs": [
+      "Activities",
+      "Activity 1"
+    ]
+  },
+  {
+    "objectID": "activity-1.html#step-1.-outline-the-specific-aims.",
+    "href": "activity-1.html#step-1.-outline-the-specific-aims.",
+    "title": "Activity 1",
+    "section": "Step 1. Outline the specific aims.",
+    "text": "Step 1. Outline the specific aims.\nContext: We want to estimate the effect of prenatal vitamin supplementation on the risk of preterm birth. However, we are worried about confounding by maternal smoking, which is not measured in our data.\nSimulation Objective: Quantify the magnitude and direction of bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth.",
+    "crumbs": [
+      "Activities",
+      "Activity 1"
+    ]
+  },
+  {
+    "objectID": "activity-1.html#step-2.-the-dgm.",
+    "href": "activity-1.html#step-2.-the-dgm.",
+    "title": "Activity 1",
+    "section": "Step 2. The DGM.",
+    "text": "Step 2. The DGM.\nWe need to develop code that can generate one randomly sampled cohort based on our predefined data generating mechanism. We start with one cohort to build out this code.\n\nHelper functions\nFirst, create “helper” functions we will use throughout our simulation.\n\n\n\n\n\n\n\n\nPseudo random number generation\n1. Why do we want random numbers?\nSimulations use random numbers to stand in for uncertainty / variability. We can use this to:\n\nmodel real-world random error\napproximate things that are hard to solve analytically\n\ncan’t use exact math? simulate!\nwe do this when want to know the “truth”\n\ntest statistical methods\n\nsee how well a test or estimator performs (bias, standard error, coverage)\n\nbootstrap!\n\nuses random resampling to estimate uncertainty\n\n\n2. How does R generate random numbers?\nComputers can’t generate truly random numbers. R uses a “pseudo-random number generator” — an algorithm that produces a seemingly random sequence of numbers but is fully determined by a starting value (the “seed”). The generator will not repeat for a long time, and for our purposes is random enough.\n3. What are we doing when we set the seed?\nWhen we set the seed, we are telling R where to start in the pseudo-random number sequence. This allows us to replicate our results in other R sessions. If we don’t set the seed, the pseudo-RNG uses the system clock and process ID, so results will differ every session.\n4. Why do we care about setting the seed?\nFor reproducibility!\n\n\n\n\n\n\nNow let’s set the seed for the rest of the simulation. Do this before any random number generation.\n\n\n\n\n\n\n\n\nAssign our simulation parameters\nNext, we set our simulation parameters based on the prenatal example. Setting them up as variables lets us change them easily and sets us up for success for creating a function later on.\nRecall our DAG:\n\n\n\n\n\n\n\n\n\n\n\n\n\nCreate the simulated dataset using simulation parameters\nWe do this using potential outcomes. The steps are as follows:\n\nGenerate the baseline population, where 20% of the population are smokers.\n\n\\[Z\\sim Bernoulli(p=0.2)\\]\n\nNext, generate the potential outcomes. For each individual, we generate the potential outcome for preterm birth under each “treatment strategy” (prenatal vitamins vs. no prenatal vitamins) conditional on smoking status. This allows us to recover the truth, because it breaks the confounding structure.\n\n\\[Y^{x=0}\\sim~Bernoulli(p=expit(-2.18 +log(1.5)\\times Z))\\]\n\\[Y^{x=1}\\sim~Bernoulli(p=expit(-2.18 +log(1.5)\\times Z + log(0.9)\\times X))\\]\n\nGenerate observed treatment conditional on smoking status.\n\n\\[X|Z=1\\sim Bernoulli(p=0.80)\\]\n\\[X|Z=0\\sim Bernoulli(p=0.95)\\]\n\nAssign the observed outcome based on the observed treatment.\n\n\\[Y = Y^{x=1}\\times X + Y^{x=0}\\times (1-X)\\]\n\n\n\n\n\n\n\n\nAside: deriving the balancing intercept\nUsing R! Very helpful if we want to start moving parameters around and need to rederive the intercept.\n\n\n\n\n\n\n\n\nTest the simulated dataset\nEvaluate whether the marginal proportions of specific variables match your expectations.\nLook at the marginal distribution of smoking. We would expect ~20% to have smoke equal to 1.\n\n\n\n\n\n\nLook at the marginal distribution of prenatal vitamin supplementation. We would expect ~80% of smokers and ~95% of non-smokers to have prenatal equal to 1.\n\n\n\n\n\n\nLook at the marginal probability of preterm birth. We would expect ~10% of the total population to have experienced a preterm birth.",
+    "crumbs": [
+      "Activities",
+      "Activity 1"
+    ]
+  },
+  {
+    "objectID": "activity-1.html#step-3.-define-the-estimand-or-target-of-the-analysis.",
+    "href": "activity-1.html#step-3.-define-the-estimand-or-target-of-the-analysis.",
+    "title": "Activity 1",
+    "section": "Step 3. Define the estimand or target of the analysis.",
+    "text": "Step 3. Define the estimand or target of the analysis.\nHere, we are interested in the total effect of prenatal vitamins on the risk of preterm birth. We want to quantify this as the marginal risk difference among the entire baseline population. Essentially, we want to contrast the risk had everyone received prenatal vitamins and the risk had no one received prenatal vitamins.\n\\[E(Y^{x=1})-E(Y^{x=0})\\]",
+    "crumbs": [
+      "Activities",
+      "Activity 1"
+    ]
+  },
+  {
+    "objectID": "activity-1.html#step-4.-identify-the-methods-to-be-implemented-in-the-study.",
+    "href": "activity-1.html#step-4.-identify-the-methods-to-be-implemented-in-the-study.",
+    "title": "Activity 1",
+    "section": "Step 4. Identify the methods to be implemented in the study.",
+    "text": "Step 4. Identify the methods to be implemented in the study.\nWe are not comparing methods but instead want to understand the effect of confounding on our results. As a result, we need only identify a method that targets the total effect of prenatal vitamin use on the risk of preterm birth. Direct outcome model adjustment would provide a conditional RD, while we want the marginal estimate that targets the baseline population.\nOne appropriate method for doing this is inverse probability of treatment weighting. Below, we calculate the unadjusted and adjusted RD.\n\nCalculate the unadjusted risk difference.\n\n\n\n\n\n\n\n\nCalculate the risk difference after adjusting for confounding by smoking.\nFirst we estimate the weighted risk difference with the known weights.\n\nWith known weights for prenatal vitamins by smoking status\n\n\n\n\n\n\nHere, we can see that the weighted risk difference is different from the unweighted estimate.",
+    "crumbs": [
+      "Activities",
+      "Activity 1"
+    ]
+  },
+  {
+    "objectID": "activity-1.html#step-5.-specify-the-performance-measures.",
+    "href": "activity-1.html#step-5.-specify-the-performance-measures.",
+    "title": "Activity 1",
+    "section": "Step 5. Specify the performance measures.",
+    "text": "Step 5. Specify the performance measures.\nWe have determined that we are interested in bias as a performance measure.\nFor each sample, bias is equivalent to \\(\\hat{\\theta}-\\theta\\), where \\(\\theta\\) is the true risk difference.\nFor multiple samples, \\(Bias = E[\\hat{\\theta}] - \\theta\\). If we are only interested in bias, we don’t necessarily need to generate a bunch of repeated samples — we can just take one large sample and compare the unweighted and weighted estimates to the truth. Note this is not true for all scenarios: here our estimators converge to a true value as \\(n\\) grows large, are linear (risk difference), and we are not exploring issues with finite sample bias.\nUsing our large sample and potential outcomes we already generated, we can determine the “truth” to use for estimating bias. We could also do this mathematically, since this is a simple example — see the appendix of the slides.\n\n\n\n\n\n\nIf we have any interest in the sampling distribution of our estimators (MSE, variance, CI coverage), we need to move to repeated sampling. That’s what Activity 2 does next.",
+    "crumbs": [
+      "Activities",
+      "Activity 1"
+    ]
+  },
+  {
+    "objectID": "activity-2.html",
+    "href": "activity-2.html",
+    "title": "Activity 2",
+    "section": "",
+    "text": "Prefer to work locally? Download the local version — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render. The local version uses many more replicates (10,000 vs. 500 here) for a more precise estimate of bias and coverage — the browser version is scaled down so it runs in well under a minute.",
+    "crumbs": [
+      "Activities",
+      "Activity 2"
+    ]
+  },
+  {
+    "objectID": "activity-2.html#before-you-begin",
+    "href": "activity-2.html#before-you-begin",
+    "title": "Activity 2",
+    "section": "Before you begin",
+    "text": "Before you begin\nThe packages below are pre-installed for this page. Run this chunk to load them into your session.",
+    "crumbs": [
+      "Activities",
+      "Activity 2"
+    ]
+  },
+  {
+    "objectID": "activity-2.html#step-1.-outline-the-specific-aims.",
+    "href": "activity-2.html#step-1.-outline-the-specific-aims.",
+    "title": "Activity 2",
+    "section": "Step 1. Outline the specific aims.",
+    "text": "Step 1. Outline the specific aims.\nContext: We want to estimate the effect of prenatal vitamin supplementation on the risk of preterm birth. However, we are worried about confounding by maternal smoking, which is not measured in our data. We also want to understand the implications for different approaches to standard error estimation.\nSimulation Objectives:\n\nQuantify the magnitude and direction of bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth (Activity 1).\nCompare the 95% confidence interval coverage for the risk difference using different approaches to standard error estimation, including model-based SEs and sandwich SEs (Activity 2).",
+    "crumbs": [
+      "Activities",
+      "Activity 2"
+    ]
+  },
+  {
+    "objectID": "activity-2.html#step-2.-determine-the-appropriate-data-generating-mechanism.",
+    "href": "activity-2.html#step-2.-determine-the-appropriate-data-generating-mechanism.",
+    "title": "Activity 2",
+    "section": "Step 2. Determine the appropriate data generating mechanism.",
+    "text": "Step 2. Determine the appropriate data generating mechanism.\n\nHelper functions\nFirst, create the “helper” functions we will use throughout our simulation.\n\n\n\n\n\n\n\n\nFunction for the DGM\nCreate a function for the DGM that we can randomly sample from. The code is near-identical to the code from the one-random-sample example in Activity 1, but adds in a derivation for the intercept so we can change parameters without having to re-derive it by hand each time.\n\n\n\n\n\n\n\n\nSet the seed\nALWAYS before any random number generation!\n\n\n\n\n\n\n\n\nGenerate the “truth”\nFirst, create a large re-sampled dataset from which to derive the truth. By doing this after setting the seed, we ensure that we use the same random state start and thus do not overlap with random states from the “observed” data. See Morris et al. (2019) for additional detail on this.\n\n\n\n\n\n\nThe local (downloads) version uses a 10,000,000-person sample for the truth. Here in the browser we use 2,000,000 — still large enough for a very precise Monte Carlo estimate of the true risk difference, but much faster to generate in webR.\n\n\n\n\n\n\n\n\n\n\n\nResample many times\nNow we want to re-sample from this DGM many times to understand the sampling behavior of our estimators. Note that we are not resetting the seed with each iteration. See Morris et al. (2019) for additional detail.\n\n\n\n\n\n\nThe local (downloads) version uses 10,000 replicates. Here in the browser we use 500, which is enough to see the qualitative pattern in bias and coverage, though the estimates will look noisier — a good illustration of Monte Carlo error in its own right!",
+    "crumbs": [
+      "Activities",
+      "Activity 2"
+    ]
+  },
+  {
+    "objectID": "activity-2.html#step-3.-define-the-estimand-of-the-analysis.",
+    "href": "activity-2.html#step-3.-define-the-estimand-of-the-analysis.",
+    "title": "Activity 2",
+    "section": "Step 3. Define the estimand of the analysis.",
+    "text": "Step 3. Define the estimand of the analysis.\nThe slides illustrate how to derive the truth mathematically. However, this is sometimes challenging to do but can be estimated from the DGM with a large n. So, we illustrate how to do that below.",
+    "crumbs": [
+      "Activities",
+      "Activity 2"
+    ]
+  },
+  {
+    "objectID": "activity-2.html#step-4.-identify-the-methods-to-be-implemented-in-the-study.",
+    "href": "activity-2.html#step-4.-identify-the-methods-to-be-implemented-in-the-study.",
+    "title": "Activity 2",
+    "section": "Step 4. Identify the methods to be implemented in the study.",
+    "text": "Step 4. Identify the methods to be implemented in the study.\nWe are comparing three estimators:\n\nUnweighted risk difference\nIPT weighted risk difference (known weights)\nIPT weighted risk difference (estimated weights)\n\nAND two approaches for standard error estimation:\n\nModel-based SEs\nSandwich estimator for SEs\n\n\nFirst, add known and estimated IPT weights to each of the simulation samples.\n\n\n\n\n\n\n\n\nNow, within each sample, estimate the risk difference and standard errors for each approach.\n\n\n\n\n\n\n\n\nNext, calculate whether the true RD lies within the calculated confidence intervals for each sample, and calculate the difference between the estimated RD and true RD (“error”) for each sample.\n\n\n\n\n\n\nHow does bias compare across the unadjusted, known-weight, and estimated-weight estimators? Is coverage at (or near) the nominal 95% for both SE approaches, or does one look conservative (coverage above 95%) while the other looks anticonservative (coverage below 95%)? Try re-running the resampling chunk with more replicates — how much does the coverage estimate itself move around?",
+    "crumbs": [
+      "Activities",
+      "Activity 2"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "ISPE 2026 Simulation Workshop",
+    "section": "",
+    "text": "Welcome to the companion website for the ISPE 2026 Simulation Workshop.",
+    "crumbs": [
+      "Introduction"
+    ]
+  },
+  {
+    "objectID": "index.html#about-this-workshop",
+    "href": "index.html#about-this-workshop",
+    "title": "ISPE 2026 Simulation Workshop",
+    "section": "About This Workshop",
+    "text": "About This Workshop\nThis workshop covers how to design, implement, and evaluate a Monte Carlo simulation study for a causal inference problem — using confounding by an unmeasured variable, inverse probability of treatment weighting (IPTW), and standard error estimation as a running example.\nTopics include:\n\nThe ADEMP framework (Aims, Data-generating mechanisms, Estimand, Methods, Performance measures) for planning a simulation study\nBuilding a data-generating mechanism (DGM) from a causal diagram, and deriving a “balancing intercept” so the DGM matches a target marginal outcome risk\nScaling a single simulated sample up to thousands of replicates to study the sampling behavior of an estimator\nComparing standard error estimators (model-based vs. sandwich/robust) by their confidence interval coverage\n\nThe workshop alternates between didactic sessions and hands-on activities. This site hosts the activity materials. Each activity page contains live, runnable R code powered by webR — no local R installation needed. When you load an activity page, the necessary packages download automatically in the background. Once ready, click Run on any code block to execute it directly in your browser.",
+    "crumbs": [
+      "Introduction"
+    ]
+  },
+  {
+    "objectID": "index.html#materials",
+    "href": "index.html#materials",
+    "title": "ISPE 2026 Simulation Workshop",
+    "section": "Materials",
+    "text": "Materials\nThe code can be run directly in the browser from this website. If you’d prefer downloading files and running locally, each activity page has a “Download the local version” link at the top — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render.\n\nActivity 1 — One random sample from the data-generating mechanism: bias estimation\nActivity 2 — One thousand random samples: sampling properties and SE estimation\nActivity 3 — Study planning (coming soon)",
+    "crumbs": [
+      "Introduction"
+    ]
+  },
+  {
+    "objectID": "index.html#how-to-use-this-site",
+    "href": "index.html#how-to-use-this-site",
+    "title": "ISPE 2026 Simulation Workshop",
+    "section": "How to Use This Site",
+    "text": "How to Use This Site\nNavigate using the sidebar on the left. Start with Designing a Simulation Study for background on the ADEMP framework and the running example. Then work through the Activities in order — each activity builds on the previous one.",
+    "crumbs": [
+      "Introduction"
+    ]
+  },
+  {
+    "objectID": "index.html#instructors",
+    "href": "index.html#instructors",
+    "title": "ISPE 2026 Simulation Workshop",
+    "section": "Instructors",
+    "text": "Instructors\nTimothy (Tim) Feeney and Catherine (Catie) Wiener",
+    "crumbs": [
+      "Introduction"
+    ]
+  }
+]
