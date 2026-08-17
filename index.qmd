@@ -1,51 +1,35 @@
 ---
-title: "Modern Uses of Propensity Scores"
-subtitle: "Weighting, estimands, and moving beyond the bootstrap"
+title: "ISPE 2026 Simulation Workshop"
+subtitle: "Designing and conducting simulation studies for causal inference methods"
 ---
 
-Welcome to the companion website for the **SER 2026 Propensity Score Workshop**.
+Welcome to the companion website for the **ISPE 2026 Simulation Workshop**.
 
 ## About This Workshop
 
-This workshop covers modern uses of propensity score methods in epidemiology, with a focus on:
+This workshop covers how to design, implement, and evaluate a Monte Carlo simulation study for a causal inference problem — using confounding by an unmeasured variable, inverse probability of treatment weighting (IPTW), and standard error estimation as a running example.
 
-- Weighting approaches to estimate marginal causal effects (ATE, ATT, ATU)
-- Choosing the right estimand for your research question
-- Standard error estimation beyond the bootstrap: sandwich variance and M-estimation
+Topics include:
 
-The workshop alternates between didactic sessions and hands-on activities. This site hosts the activity materials. Each activity page contains live, runnable R code — no local R installation needed. When you load an activity page, the necessary packages download automatically in the background. Once ready, click **Run** on any code block to execute it.
+- The **ADEMP framework** (Aims, Data-generating mechanisms, Estimand, Methods, Performance measures) for planning a simulation study
+- Building a data-generating mechanism (DGM) from a causal diagram, and deriving a "balancing intercept" so the DGM matches a target marginal outcome risk
+- Scaling a single simulated sample up to thousands of replicates to study the sampling behavior of an estimator
+- Comparing standard error estimators (model-based vs. sandwich/robust) by their confidence interval coverage
+
+The workshop alternates between didactic sessions and hands-on activities. This site hosts the activity materials. Each activity page contains live, runnable R code powered by [webR](https://docs.r-wasm.org/webr/latest/) — no local R installation needed. When you load an activity page, the necessary packages download automatically in the background. Once ready, click **Run** on any code block to execute it directly in your browser.
 
 ## Materials
 
-The workshop materials require R and R Studio. [Installation instructions here](downloads/install_R_handout.docx){download="install_R_handout.docx"}
+The code can be run directly in the browser from this website. If you'd prefer downloading files and running locally, each activity page has a **"Download the local version"** link at the top — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render`.
 
-The code can be run directly in the browser from this website. However, if you'd prefer downloading files and running locally (recommended!), download here:
-
-- [Slides](slides.html)
-- [Data](data/tpa_ds.rds)
-- [Metadata helper](R/metadata.R)
-- [Activity 1](downloads/activity-1.qmd){download="activity-1.qmd"}
-- [Activity 2](downloads/activity-2.qmd){download="activity-2.qmd"}
-- [Activity 3](downloads/activity-3.qmd){download="activity-3.qmd"}
-
-## Workshop Structure
-
-| Time | Session |
-|------|---------|
-| Introduction | Clinical problem and descriptive analysis → **Activity 1** |
-| Didactics | Causal inference, estimands, propensity scores, IPTW |
-| Estimation | Propensity score estimation and weighted analyses → **Activity 2** |
-| Break | |
-| Didactics | Standard error estimation |
-| Inference | Robust variance, bootstrap, M-estimation → **Activity 3** |
-| Closing | Questions and discussion |
+- [Activity 1](downloads/activity-1.qmd){download="activity-1.qmd"} — One random sample from the data-generating mechanism: bias estimation
+- [Activity 2](downloads/activity-2.qmd){download="activity-2.qmd"} — One thousand random samples: sampling properties and SE estimation
+- [Activity 3](downloads/activity-3.qmd){download="activity-3.qmd"} — Study planning (coming soon)
 
 ## How to Use This Site
 
-Navigate using the sidebar on the left. Start with the **Example Overview** pages for background on the clinical question and data. Then work through the **Activities** in order — each activity builds on the previous one.
+Navigate using the sidebar on the left. Start with **Designing a Simulation Study** for background on the ADEMP framework and the running example. Then work through the **Activities** in order — each activity builds on the previous one.
 
 ## Instructors
 
 Timothy (Tim) Feeney and Catherine (Catie) Wiener
-
-*Johns Hopkins University and UNC Chapel Hill*

@@ -4,28 +4,21 @@ project:
   type: website
   render:
     - "*.qmd"
-    - "!old_lab/**"
-    - "!slides/**"
-    - "!slides.qmd"
     - "!downloads/**"
   resources:
-    - R/metadata.R
-    - data/tpa_ds.rds
     - downloads/
-    - slides.html
+    - figures/
 
 website:
-  title: "Modern uses of propensity scores"
+  title: "ISPE 2026 Simulation Workshop"
   sidebar:
     style: "docked"
     search: true
     contents:
       - text: "Introduction"
         href: index.qmd
-      - section: "Example Overview"
-        contents:
-          - overview.qmd
-          - data_dictionary.qmd
+      - text: "Designing a Simulation Study"
+        href: overview.qmd
       - section: Activities
         contents:
           - activity-1.qmd
@@ -39,5 +32,3 @@ format:
       - brand
     css: styles.css
     toc: true
-
-

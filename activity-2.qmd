@@ -1,441 +1,254 @@
 ---
 title: "Activity 2"
-subtitle: "Propensity Score Estimation and Weighting"
+subtitle: "One thousand random samples from the data generating mechanism"
 toc: true
+toc-expand: 2
 format: live-html
 webr:
   show-startup-message: false
   packages:
     - dplyr
     - purrr
-    - ggplot2
-    - kableExtra
-    - tidyr
-    - broom
-    - tableone
-    - survey
-    - smd
-  resources:
-    - R/metadata.R
-    - data/tpa_ds.rds
+    - sandwich
 ---
 
 ::: {.callout-note appearance="minimal"}
-**Prefer to work locally?** [Download the local version](downloads/activity-2.qmd){download="activity-2.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render`. You will also need [`data/tpa_ds.rds`](data/tpa_ds.rds) and [`R/metadata.R`](R/metadata.R).
+**Prefer to work locally?** [Download the local version](downloads/activity-2.qmd){download="activity-2.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render`. The local version uses many more replicates (10,000 vs. 500 here) for a more precise estimate of bias and coverage — the browser version is scaled down so it runs in well under a minute.
 :::
 
-In Activity 2, we estimate the propensity score, construct inverse probability of treatment weights for different estimands, assess balance after weighting, and estimate marginal causal effects.
+# One Thousand Random Samples from the Data Generating Mechanism
 
-# Setup
+We want to create many random samples of 500 people from our data generating mechanism (DGM). This allows us to understand the sampling properties of our estimators and compare approaches for estimating standard errors.
 
-Each activity page runs independently. Run the block below to reload the data and reproduce the preprocessing from Activity 1 before continuing.
+To do this, we need to build a function that samples from the DGM. Luckily, we can adapt the code we wrote for one sample in Activity 1.
+
+## Before you begin
+
+The packages below are pre-installed for this page. Run this chunk to load them into your session.
 
 ```{webr}
 library(dplyr)
 library(purrr)
-library(ggplot2)
-library(kableExtra)
-library(tidyr)
-library(broom)
-library(tableone)
-library(survey)
-library(smd)
-
-source("R/metadata.R")
-tpa_ds <- readRDS("data/tpa_ds.rds")
-
-tpa_ds$age_5f <- cut(tpa_ds$age, breaks = seq(14, 105, by = 5), right = FALSE)
-
-exposure    <- "tpa"
-outcome     <- "death"
-confounders <- c("age", "sex", "living", "comorbid", "cardiac", "prevstroke",
-                 "htn", "hyperchol", "afib", "aphasia", "paresis_3f", "rankpre", "icu")
-conf_cat    <- c("icu", "comorbid", "cardiac", "prevstroke", "htn", "hyperchol",
-                 "afib", "aphasia")
-
-tpa_ds_cc <- tpa_ds |>
-  dplyr::filter(dplyr::if_all(dplyr::all_of(c(exposure, outcome, confounders)), ~!is.na(.x)))
-
-cat("Data loaded:", nrow(tpa_ds_cc), "complete cases\n")
+library(sandwich)
 ```
 
-# Propensity score model
+## Step 1. Outline the specific aims.
 
-The propensity score is the probability of receiving t-PA given the observed confounders: $\hat{e}(\mathbf{L}) = \hat{P}[A=1 \mid \mathbf{L}]$. We estimate it using logistic regression with treatment as the outcome and all confounders as predictors.
+**Context:** We want to estimate the effect of prenatal vitamin supplementation on the risk of preterm birth. However, we are worried about confounding by maternal smoking, which is not measured in our data. We also want to understand the implications for different approaches to standard error estimation.
 
-Variable selection should be guided by your causal diagram (DAG). Include confounders (causes of both treatment and outcome) and outcome predictors. Exclude mediators (variables on the causal pathway from treatment to outcome).
+**Simulation Objectives:**
+
+1. Quantify the magnitude and direction of bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth (Activity 1).
+
+2. **Compare the 95% confidence interval coverage for the risk difference using different approaches to standard error estimation, including model-based SEs and sandwich SEs (Activity 2).**
+
+## Step 2. Determine the appropriate data generating mechanism.
+
+### Helper functions
+
+First, create the "helper" functions we will use throughout our simulation.
 
 ```{webr}
-expform <- sprintf("tpa ~ %s", paste(confounders, collapse = " + "))
+# The expit function is the inverse of the log-odds. It takes in a log-odds (x),
+# applies the inverse-logit function and returns a probability
+expit <- function(x) {
+  return(exp(x) / (1 + exp(x)))
+}
 
-ps_model <- glm(as.formula(expform), data = tpa_ds_cc,
-                family = binomial(link = "logit"))
+# We also include the balancing intercept function in case we want to
+# change around any parameters and it needs to be re-derived
+derive_intercept <- function(py, prob_prenatal, prob_smoke,
+                             or_smoke, or_prenatal){
 
-## Add propensity score (predicted probability of treatment)
-tpa_ds_cc$ps <- predict(ps_model, type = "response")
+  # marginal probability of treatment
+  prob_prenatal <- prob_prenatal[1] * (1-prob_smoke) + prob_prenatal[2] * prob_smoke
 
-## Add marginal probability of treatment (for stabilized weights)
-tpa_ds_cc$pa <- predict(glm(tpa ~ 1, data = tpa_ds_cc,
-                            family = binomial(link = "logit")),
-                        type = "response")
-
-cat("Propensity score summary:\n")
-summary(tpa_ds_cc$ps)
+  -log(1/py - 1) - or_prenatal*prob_prenatal - or_smoke*prob_smoke
+}
 ```
 
-## Propensity score diagnostics
+### Function for the DGM
 
-Examine the propensity score distribution within each treatment group. Large regions of non-overlap ("lack of positivity") indicate covariate profiles where only treated or only untreated people appear — causal effects cannot be estimated there without extrapolation.
-
-```{webr}
-cat("Propensity scores among treated (tPA = 1):\n")
-summary(tpa_ds_cc$ps[tpa_ds_cc$tpa == 1])
-
-cat("\nPropensity scores among untreated (tPA = 0):\n")
-summary(tpa_ds_cc$ps[tpa_ds_cc$tpa == 0])
-```
+Create a function for the DGM that we can randomly sample from. The code is near-identical to the code from the one-random-sample example in Activity 1, but adds in a derivation for the intercept so we can change parameters without having to re-derive it by hand each time.
 
 ```{webr}
-ggplot(tpa_ds_cc, aes(x = ps, fill = tpa_f)) +
-  geom_density(alpha = 0.4) +
-  theme_minimal() +
-  labs(
-    y = "Density", x = "Propensity score", fill = "Treatment group",
-    title = "Propensity score distribution by treatment (unweighted)"
+dgm <- function(simid = 0,
+                n = 500,
+                prob_smoke = 0.3,
+                prob_prenatal = c(0.9, 0.3),
+                or_prenatal = log(0.9),
+                or_smoke = log(1.5),
+                prob_preterm = 0.11){
+
+  # Dynamically derive the intercept term
+  y_intercept <- derive_intercept(py = prob_preterm,
+                                  prob_prenatal = prob_prenatal,
+                                  prob_smoke = prob_smoke,
+                                  or_smoke = or_smoke,
+                                  or_prenatal = or_prenatal)
+  dplyr::tibble(
+    # Simulation number
+    simid = simid,
+
+    # Create n participants
+    id = 1:n,
+
+    # Randomly select smoking
+    smoke = rbinom(n = n, size = 1, prob = prob_smoke),
+
+    # Generate potential outcome under no treatment
+    preterm_x0 = rbinom(n = n, size = 1,
+                        prob = expit(y_intercept + (or_smoke * smoke))),
+
+    # Generate potential outcome under treatment
+    preterm_x1 = rbinom(n = n, size = 1,
+                        prob = expit(y_intercept + (or_smoke * smoke) + or_prenatal)),
+
+    # Generate observed treatment conditional on smoking
+    p_prenatal = prob_prenatal[smoke + 1], # probability of prenatal based on smoking
+    p_prenatal_margin = prob_prenatal[1]*(1-prob_smoke) + prob_prenatal[2]*(prob_smoke),
+    prenatal = rbinom(n = n, size = 1, prob = p_prenatal),
+
+    # Assign actual outcome conditional on observed treatment
+    preterm = preterm_x0*(1-prenatal) + preterm_x1*(prenatal)
   )
+}
 ```
 
-What do you notice about the overlap? Are there regions of the propensity score where one treatment group is barely represented?
+### Set the seed
 
----
-
-# ATE: Average Treatment Effect
-
-The ATE is the effect of treatment in the *entire population* — had everyone received t-PA vs. had no one received t-PA. We use **inverse probability of treatment (IPT) weights**.
-
-$$\hat{\omega}_{i,\text{IPT}} = \frac{I(A_i=1)}{\hat{e}(\mathbf{L}_i)} + \frac{I(A_i=0)}{1-\hat{e}(\mathbf{L}_i)}$$
-
-**Stabilized weights** scale by the marginal probability of treatment. They have the same mean as 1, produce narrower confidence intervals, and are generally preferred:
-
-$$\hat{\omega}_{i,\text{sIPT}} = \frac{I(A_i=1)\,\hat{P}(A=1)}{\hat{e}(\mathbf{L}_i)} + \frac{I(A_i=0)\,\hat{P}(A=0)}{1-\hat{e}(\mathbf{L}_i)}$$
-
-## Calculate IPT weights
+ALWAYS before any random number generation!
 
 ```{webr}
-## Unstabilized IPT weights
-tpa_ds_cc$ipt <- with(tpa_ds_cc,
-  tpa / ps + (1 - tpa) / (1 - ps)
+# Set the random seed. It's good to use a relatively random starting number, not just 1234 or similar.
+set.seed(57846)
+```
+
+### Generate the "truth"
+
+First, create a large re-sampled dataset from which to derive the truth. By doing this after setting the seed, we ensure that we use the same random state start and thus do not overlap with random states from the "observed" data. See Morris et al. (2019) for additional detail on this.
+
+::: {.callout-tip appearance="minimal"}
+The local (downloads) version uses a 10,000,000-person sample for the truth. Here in the browser we use 2,000,000 — still large enough for a very precise Monte Carlo estimate of the true risk difference, but much faster to generate in webR.
+:::
+
+```{webr}
+# Random sample for estimating the truth
+truth <- dgm(n = 2000000, prob_prenatal = c(0.9, 0.3))
+```
+
+### Resample many times
+
+Now we want to re-sample from this DGM many times to understand the sampling behavior of our estimators. Note that we are *not* resetting the seed with each iteration. See Morris et al. (2019) for additional detail.
+
+::: {.callout-tip appearance="minimal"}
+The local (downloads) version uses 10,000 replicates. Here in the browser we use 500, which is enough to see the qualitative pattern in bias and coverage, though the estimates will look noisier — a good illustration of Monte Carlo error in its own right!
+:::
+
+```{webr}
+# Randomly sample 500 datasets of 500 people for the analysis
+data1000 <- purrr::map(.x = 1:500, dgm, n = 500, prob_prenatal = c(0.9, 0.3))
+```
+
+## Step 3. Define the estimand of the analysis.
+
+The slides illustrate how to derive the truth mathematically. However, this is sometimes challenging to do but can be estimated from the DGM with a large n. So, we illustrate how to do that below.
+
+```{webr}
+# Estimate the "true" RD using potential outcomes -- no complex analysis needed!
+true_rd <- mean(truth$preterm_x1) - mean(truth$preterm_x0)
+true_rd
+```
+
+## Step 4. Identify the methods to be implemented in the study.
+
+We are comparing three estimators:
+
+1. Unweighted risk difference
+2. IPT weighted risk difference (known weights)
+3. IPT weighted risk difference (estimated weights)
+
+AND two approaches for standard error estimation:
+
+1. Model-based SEs
+2. Sandwich estimator for SEs
+
+### First, add known and estimated IPT weights to each of the simulation samples.
+
+```{webr}
+data1000 <- purrr::map(data1000,
+                       function(x){
+                         x |>
+                           dplyr::mutate(
+                             est_prenatal_margin = mean(prenatal)
+                           ) |>
+                           dplyr::mutate(
+                             ipw = if_else(prenatal == 1,
+                                           p_prenatal_margin/p_prenatal,
+                                           p_prenatal_margin/(1-p_prenatal)),
+                             ipw_est = if_else(prenatal == 1,
+                                               est_prenatal_margin/mean(prenatal),
+                                               (1-est_prenatal_margin)/(1-mean(prenatal))),
+                             .by = smoke
+                             )
+                         }
+                       )
+```
+
+### Now, within each sample, estimate the risk difference and standard errors for each approach.
+
+```{webr}
+rds_ses <- purrr::map_dfr(
+  data1000,
+  function(x){
+    unadj <- glm(preterm ~ prenatal, data = x, family = binomial(link = "identity"))
+    adj_known <- glm(preterm ~ prenatal, data = x,
+                 weights = ipw, family = quasibinomial(link = "identity"))
+    adj_est <- glm(preterm ~ prenatal, data = x,
+                 weights = ipw_est, family = quasibinomial(link = "identity"))
+
+    dplyr::tibble(
+      estimator = c("Unadjusted", "Adjusted (Known)", "Adjusted (Estimated)"),
+
+      # extract risk difference from the models
+      rd = c(coef(unadj)[2], coef(adj_known)[2], coef(adj_est)[2]),
+
+      # extract the standard errors from the models
+      model_se = c(sqrt(diag(vcov(unadj)))[2],
+                    sqrt(diag(vcov(adj_known)))[2],
+                    sqrt(diag(vcov(adj_est)))[2]),
+
+      # use the sandwich package to get the sandwich-based standard errors.
+      # type = "HC3" applies a finite-sample correction (a leverage-weighted
+      # jackknife-style inflation) rather than the uncorrected HC0 sandwich,
+      # which is known to be biased downward at moderate sample sizes.
+      sandwich_se = c( sqrt(diag(sandwich::vcovHC(unadj, type = "HC3")))[2],
+                       sqrt(diag(sandwich::vcovHC(adj_known, type = "HC3")))[2],
+                       sqrt(diag(sandwich::vcovHC(adj_est, type = "HC3")))[2])
+    )
+  }
 )
-
-## Stabilized IPT weights
-tpa_ds_cc$sipt <- with(tpa_ds_cc,
-  tpa * pa / ps + (1 - tpa) * (1 - pa) / (1 - ps)
-)
-
-cat("Unstabilized IPT weight summary:\n")
-summary(tpa_ds_cc$ipt)
-
-cat("\nStabilized IPT weight summary:\n")
-summary(tpa_ds_cc$sipt)
 ```
 
-Extreme weights (very large values) indicate near-positivity violations and can inflate variance. How do the unstabilized and stabilized weight distributions compare?
-
-## Balance after IPT weighting
-
-We check covariate balance in the IPT-weighted pseudo-population. The goal is for SMDs to fall below 0.1 for all covariates.
+### Next, calculate whether the true RD lies within the calculated confidence intervals for each sample, and calculate the difference between the estimated RD and true RD ("error") for each sample.
 
 ```{webr}
-design_ipt <- survey::svydesign(id = ~1, weights = ~ipt, data = tpa_ds_cc)
+rds_ses <- rds_ses |>
+  dplyr::mutate(
+    error = rd - true_rd,
+    model_coverage = (true_rd >= (rd - 1.96*model_se)) &  (true_rd <= (rd + 1.96*model_se)),
+    sandwich_coverage = (true_rd >= (rd - 1.96*sandwich_se)) &  (true_rd <= (rd + 1.96*sandwich_se))
+  )
 
-t1_ipt <- tableone::svyCreateTableOne(
-  data       = design_ipt,
-  vars       = confounders,
-  strata     = "tpa_f",
-  factorVars = conf_cat,
-  smd        = TRUE,
-  test       = FALSE
-)
+measures <- rds_ses |>
+  dplyr::summarize(
+    bias = mean(error),
+    model_coverage = mean(model_coverage),
+    sandwich_coverage = mean(sandwich_coverage),
+    .by = estimator
+  )
 
-kable(print(t1_ipt, smd = TRUE, printToggle = FALSE, varLabels = TRUE))
+measures
 ```
 
-## Marginal structural model: ATE
-
-A **marginal structural model (MSM)** fits a weighted outcome regression in the pseudo-population created by the weights. The weighted regression estimate is equivalent to the marginal (population-average) causal effect.
-
-```{webr}
-## ATE risk difference (linear probability model, unstabilized weights)
-ate_rd_model <- lm(death ~ tpa, data = tpa_ds_cc, weights = ipt)
-
-ate_rd <- ate_rd_model |>
-  broom::tidy(conf.int = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "ATE RD")
-
-## ATE risk ratio (log link, unstabilized weights)
-ate_rr_model <- glm(death ~ tpa, data = tpa_ds_cc, weights = ipt,
-                    family = quasibinomial(link = "log"))
-
-ate_rr <- ate_rr_model |>
-  broom::tidy(conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "ATE RR")
-
-bind_rows(ate_rd, ate_rr) |>
-  dplyr::select(term, estimate, conf.low, conf.high) |>
-  kable(digits = 3)
-```
-
----
-
-# ATT: Average Treatment Effect in the Treated
-
-The ATT is the effect of treatment among people *who were actually treated*. We target the treated group using **standardized mortality ratio (SMR) weights**:
-
-$$\hat{\omega}_{i,\text{SMR}} = I(A_i=1) + \frac{I(A_i=0)\,\hat{e}(\mathbf{L}_i)}{1-\hat{e}(\mathbf{L}_i)}$$
-
-Treated observations keep weight 1. Untreated observations are upweighted by their odds of treatment, making the untreated pseudo-population resemble the treated group.
-
-*Why might the ATT be a more relevant estimand than the ATE in this context?* t-PA has well-defined eligibility criteria. The ATE averages across everyone — including people for whom t-PA would be contraindicated. The ATT focuses on the people who look like those who actually received treatment: those who cleared the eligibility bar.
-
-## Calculate SMR weights
-
-```{webr}
-tpa_ds_cc$smr <- with(tpa_ds_cc,
-  tpa + (1 - tpa) * ps / (1 - ps)
-)
-
-cat("SMR weight summary:\n")
-summary(tpa_ds_cc$smr)
-
-cat("\nSMR weights among treated:\n")
-summary(tpa_ds_cc$smr[tpa_ds_cc$tpa == 1])
-
-cat("\nSMR weights among untreated:\n")
-summary(tpa_ds_cc$smr[tpa_ds_cc$tpa == 0])
-```
-
-## Balance after SMR weighting
-
-```{webr}
-design_smr <- survey::svydesign(id = ~1, weights = ~smr, data = tpa_ds_cc)
-
-t1_smr <- tableone::svyCreateTableOne(
-  data       = design_smr,
-  vars       = confounders,
-  strata     = "tpa_f",
-  factorVars = conf_cat,
-  smd        = TRUE,
-  test       = FALSE
-)
-
-kable(print(t1_smr, smd = TRUE, printToggle = FALSE, varLabels = TRUE))
-```
-
-## Marginal structural model: ATT
-
-```{webr}
-att_rd_model <- lm(death ~ tpa, data = tpa_ds_cc, weights = smr)
-
-att_rd <- att_rd_model |>
-  broom::tidy(conf.int = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "ATT RD")
-
-att_rr <- glm(death ~ tpa, data = tpa_ds_cc, weights = smr,
-              family = quasibinomial(link = "log")) |>
-  broom::tidy(conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "ATT RR")
-
-bind_rows(att_rd, att_rr) |>
-  dplyr::select(term, estimate, conf.low, conf.high) |>
-  kable(digits = 3)
-```
-
----
-
-# ATU: Average Treatment Effect in the Untreated
-
-The ATU asks: what would have been the effect of t-PA among people who *were not* treated? We target the untreated group using SRR (standardized risk ratio) weights:
-
-$$\hat{\omega}_{i,\text{SRR}} = \frac{I(A_i=1)\left[1-\hat{e}(\mathbf{L}_i)\right]}{\hat{e}(\mathbf{L}_i)} + I(A_i=0)$$
-
-```{webr}
-# add code here to calculate weights to target the ATU, fix the marginal structural model, and see results. 
-```
-
-*Why might the ATU be less meaningful here?* The untreated group includes patients who were ineligible for t-PA (e.g., hemorrhagic stroke, late arrival). Estimating "what would happen if we treated them" requires extrapolating to covariate regions with very few (or no) treated individuals.
-
----
-
-# Bonus: ATO — Average Treatment Effect in the Overlap Population
-
-Overlap weights target the **population with clinical equipoise** — individuals for whom there was genuine uncertainty about which treatment they would receive. Each person is weighted by the probability of receiving the treatment they *did not* get:
-
-$$\hat{\omega}_{i,\text{OW}} = I(A_i=1)\left[1-\hat{e}(\mathbf{L}_i)\right] + I(A_i=0)\,\hat{e}(\mathbf{L}_i)$$
-
-Treated individuals with high propensity scores (very likely to be treated) receive *low* overlap weights — they contribute little to learning about the counterfactual because there are few similar untreated individuals to compare against. Untreated individuals with low propensity scores are similarly downweighted. The pseudo-population is concentrated in the region of propensity score overlap.
-
-**Key properties of overlap weights:**
-
-- **No positivity violations**: weights approach zero as $\hat{e} \to 0$ or $\hat{e} \to 1$ — extreme propensity scores are automatically handled
-- **Bounded weights**: $\hat{\omega} \in (0, 1)$ for all observations, so there is no extreme upweighting
-- **Exact balance**: covariate means are exactly balanced in the weighted sample for any propensity score model
-- **Minimum variance**: among all balancing weights, overlap weights yield the smallest asymptotic variance
-
-The tradeoff is that the target population is data-adaptive: the ATO is defined by the covariate distribution and propensity score, not a pre-specified clinical group.
-
-## Calculate overlap weights
-
-```{webr}
-tpa_ds_cc$ow <- with(tpa_ds_cc,
-  tpa * (1 - ps) + (1 - tpa) * ps
-)
-
-cat("Overlap weight summary (all):\n")
-summary(tpa_ds_cc$ow)
-
-cat("\nOverlap weights among treated:\n")
-summary(tpa_ds_cc$ow[tpa_ds_cc$tpa == 1])
-
-cat("\nOverlap weights among untreated:\n")
-summary(tpa_ds_cc$ow[tpa_ds_cc$tpa == 0])
-```
-
-Unlike the IPT weights (which had a maximum near 500+), overlap weights are bounded between 0 and 1. The observations that contribute most are those near $\hat{e} = 0.5$, where both treated and untreated individuals receive weight close to 0.5.
-
-## Balance after overlap weighting
-
-```{webr}
-design_ow <- survey::svydesign(id = ~1, weights = ~ow, data = tpa_ds_cc)
-
-t1_ow <- tableone::svyCreateTableOne(
-  data       = design_ow,
-  vars       = confounders,
-  strata     = "tpa_f",
-  factorVars = conf_cat,
-  smd        = TRUE,
-  test       = FALSE
-)
-
-kable(print(t1_ow, smd = TRUE, printToggle = FALSE, varLabels = TRUE))
-```
-
-## Marginal structural model: ATO
-
-```{webr}
-ato_rd_model <- lm(death ~ tpa, data = tpa_ds_cc, weights = ow)
-
-ato_rd <- ato_rd_model |>
-  broom::tidy(conf.int = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "ATO RD")
-
-ato_rr <- glm(death ~ tpa, data = tpa_ds_cc, weights = ow,
-              family = quasibinomial(link = "log")) |>
-  broom::tidy(conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "ATO RR")
-
-bind_rows(ato_rd, ato_rr) |>
-  dplyr::select(term, estimate, conf.low, conf.high) |>
-  kable(digits = 3)
-```
-
-How does the ATO compare to the ATE and ATT? The overlap-weighted sample focuses on patients near $\hat{e} = 0.5$ — those for whom treatment assignment was most uncertain and who represent the clearest candidates for comparative effectiveness research. In datasets with substantial positivity violations (like this one), the ATE and ATO can differ meaningfully because they upweight very different subpopulations.
-
----
-
-# Love plot: Balance across weighting methods
-
-A Love plot displays SMDs for all covariates across weighting methods side-by-side. The vertical reference line at 0.1 represents a commonly used threshold for acceptable balance.
-
-```{webr}
-
-## To build this Love plot, you need the `t1` object from the unweighted Table 1.
-## This requires that the unweighted Table 1 code from Activity 1 has been run 
-## in *this* session. Below we recreate `t1`
-
-t1 <- tableone::CreateTableOne(
-  vars       = confounders,
-  strata     = "tpa_f",
-  data       = tpa_ds_cc,
-  factorVars = conf_cat,
-  smd        = TRUE,
-  test       = FALSE
-)
-
-## Extract SMDs from tableone objects and label by weight type
-smd_data <- dplyr::bind_rows(
-  tableone::ExtractSmd(t1, varLabels = TRUE) |>
-    tibble::as_tibble(rownames = "variable") |>
-    dplyr::mutate(weight = "Unweighted"),
-  tableone::ExtractSmd(t1_ipt, varLabels = TRUE) |>
-    tibble::as_tibble(rownames = "variable") |>
-    dplyr::mutate(weight = "IPT (ATE)"),
-  tableone::ExtractSmd(t1_smr, varLabels = TRUE) |>
-    tibble::as_tibble(rownames = "variable") |>
-    dplyr::mutate(weight = "SMR (ATT)"),
-  tableone::ExtractSmd(t1_ow, varLabels = TRUE) |>
-    tibble::as_tibble(rownames = "variable") |>
-    dplyr::mutate(weight = "OW (ATO)")
-)
-
-ggplot(smd_data, aes(x = `1 vs 2`, y = variable, color = weight, shape = weight)) +
-  geom_vline(xintercept = 0.1, linewidth = 0.4, linetype = "dashed") +
-  geom_point(size = 2) +
-  theme_classic() +
-  labs(y = "", x = "Standardized Mean Difference",
-       color = "Weighting method", shape = "Weighting method",
-       title = "Covariate balance before and after weighting")
-```
-
-Do both weighting approaches achieve balance (SMD < 0.1)? Are there any covariates that remain imbalanced?
-
----
-
-# Comparing all estimates
-
-Finally, we collect all effect estimates — crude, multivariable-adjusted, and weighted — to compare how the choice of method and estimand affects results.
-
-```{webr}
-## Re-estimate crude and multivariable from this session
-crude_rd_model <- glm(death ~ tpa, data = tpa_ds_cc,
-                      family = binomial(link = "identity"))
-crude_rd <- crude_rd_model |>
-  broom::tidy(conf.int = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "Crude RD")
-
-crude_rr <- glm(death ~ tpa, data = tpa_ds_cc,
-                family = binomial(link = "log")) |>
-  broom::tidy(conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "Crude RR")
-
-outform <- sprintf("death ~ tpa + %s", paste(confounders, collapse = " + "))
-multi_res <- glm(as.formula(outform), data = tpa_ds_cc,
-                 family = binomial(link = "log")) |>
-  broom::tidy(conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::filter(term == "tpa") |>
-  dplyr::mutate(term = "Conditional RR (MV)")
-
-dplyr::bind_rows(crude_rd, crude_rr, multi_res,
-                 ate_rd, ate_rr, att_rd, att_rr, atu_rd, atu_rr,
-                 ato_rd, ato_rr) |>
-  dplyr::transmute(
-    Method   = if_else(term %in% c("Crude RD", "Crude RR", "Conditional RR (MV)"),
-                       "Unadjusted / conditional", "Propensity score weighted"),
-    Estimand = term,
-    Estimate = round(estimate, 3),
-    `95% CI` = paste0("(", round(conf.low, 3), ", ", round(conf.high, 3), ")")
-  ) |>
-  kable()
-```
-
-- How do the ATE, ATT, and ATU estimates compare to each other?
-- How do the weighted estimates compare to the crude and multivariable estimates?
-- Which estimand is most relevant for the clinical question?
-- What does this tell us about why observational studies may disagree with RCTs?
+How does bias compare across the unadjusted, known-weight, and estimated-weight estimators? Is coverage at (or near) the nominal 95% for both SE approaches, or does one look conservative (coverage above 95%) while the other looks anticonservative (coverage below 95%)? Try re-running the resampling chunk with more replicates — how much does the coverage estimate itself move around?
