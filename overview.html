@@ -223,7 +223,7 @@ window.Quarto = {
 
 <section id="why-simulate" class="level1">
 <h1>Why Simulate?</h1>
-<p>Analytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when a nuisance parameter (like a propensity score) has to be estimated rather than known. Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we — as the analyst — know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.</p>
+<p>Analytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when we have to deal with multiple nuisance models (e.g., propensity score, missing data, measurement error correction). Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we — as the analyst — know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.</p>
 <p>Simulation is useful whenever you need to:</p>
 <ul>
 <li>Model real-world random error and sampling variability</li>
@@ -234,7 +234,7 @@ window.Quarto = {
 </section>
 <section id="the-ademp-framework" class="level1">
 <h1>The ADEMP Framework</h1>
-<p>Throughout this workshop we plan every simulation study using the <strong>ADEMP</strong> framework (Morris, White, and Crowther, <em>Statistics in Medicine</em>, 2019), which organizes the design of a simulation study into five components:</p>
+<p>Throughout this workshop we plan every simulation study using the <strong>ADEMP</strong> framework <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6492164/">Morris, White, and Crowther, <em>Statistics in Medicine</em>, 2019</a>, which organizes the design of a simulation study into five components:</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -276,7 +276,7 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<p>Working through the activities on this site, you will see each of these steps made explicit — first for a single simulated sample (Activity 1), then scaled up to thousands of replicates so the performance measures (bias, confidence interval coverage) can actually be evaluated (Activity 2).</p>
+<p>Working through the activities on this site, you will see each of these steps made explicit — first for a single simulated sample (Activity 1), then scaled up to thousands of replicates so the sampling-based performance measures can be evaluated (Activity 2).</p>
 </section>
 <section id="the-running-example" class="level1">
 <h1>The Running Example</h1>
@@ -291,26 +291,19 @@ window.Quarto = {
 </div>
 </div>
 </div>
-<p>Because we’re <em>simulating</em> this scenario rather than observing it, we get to play both analyst and omniscient narrator: we choose the true causal structure and effect sizes, generate data consistent with them, and then see how well an analysis that ignores smoking (as a real analyst — who doesn’t have this variable — would have to) recovers the truth.</p>
 <p>Mapped onto ADEMP, the running example looks like this:</p>
 <ul>
 <li><strong>Aims</strong> —</li>
 </ul>
-<blockquote class="blockquote">
 <ol type="1">
-<li>Quantify the bias in the estimated effect of prenatal vitamins on preterm birth when maternal smoking confounds the relationship but is unmeasured.</li>
+<li><p>Quantify the bias in the estimated effect of prenatal vitamins on preterm birth when maternal smoking confounds the relationship but is unaccounted for in the analysis.</p></li>
+<li><p>Compare approaches (naive, robust) to standard error estimation.</p></li>
 </ol>
-</blockquote>
-<blockquote class="blockquote">
-<ol start="2" type="1">
-<li>Compare approaches (naive, robust) to standard error estimation.</li>
-</ol>
-</blockquote>
 <ul>
 <li><strong>Data-generating mechanism</strong> — Simulate smoking status, both potential outcomes for preterm birth (with and without vitamins), observed vitamin use conditional on smoking, and the observed outcome — see Activity 1.</li>
 <li><strong>Estimand</strong> — The marginal risk difference, <span class="math inline">\(E[Y^{x=1}] - E[Y^{x=0}]\)</span>: the risk of preterm birth had <em>everyone</em> taken prenatal vitamins vs.&nbsp;had <em>no one</em> taken them.</li>
-<li><strong>Methods</strong> — An unadjusted risk difference, and inverse probability of treatment weighted (IPTW) risk differences using both known and estimated weights — see Activities 1–2.</li>
-<li><strong>Performance measures</strong> — Bias (Activity 1), and 95% confidence interval coverage under model-based vs.&nbsp;sandwich standard errors (Activity 2).</li>
+<li><strong>Methods</strong> — An unadjusted risk difference, and inverse probability of treatment weighted (IPTW) risk differences using the known treatment weights — see Activities 1–2.</li>
+<li><strong>Performance measures</strong> — Bias (Activity 1), and average model-based vs.&nbsp;sandwich standard errors (Activity 2).</li>
 </ul>
 </section>
 <section id="next-steps" class="level1">

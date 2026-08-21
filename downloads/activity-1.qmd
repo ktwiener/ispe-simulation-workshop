@@ -118,17 +118,17 @@ n <- 10000000 # Big sample size!
 prob_smoke <- 0.2 # probability of Z = 1 (smoking)
 
 # probabilities for observed treatment
-# 95% non-smokers use prenatal vitamins
-# 80% smokers use prenatal vitamins
-prob_prenatal <- c(0.95, 0.80)
+# 85% non-smokers use prenatal vitamins
+# 65% smokers use prenatal vitamins
+prob_prenatal <- c(0.85, 0.65)
 
 
 # effects (log odds ratios) on smoking and prenatal vitamins on the outcome
 or_prenatal <- log(0.9) # odds ratio for prenatal vitamins on preterm birth
-or_smoke <- log(1.5) # odds ratio for smoking on preterm birth
+or_smoke <- log(3) # odds ratio for smoking on preterm birth
 
 # outcome model intercept (derived using the balancing intercept)
-y_intercept <- -2.18
+y_intercept <- -2.33
 ```
 
 ### Create the simulated dataset using simulation parameters
@@ -145,15 +145,15 @@ $$Z\sim Bernoulli(p=0.2)$$
    - For each individual, we will generate the potential outcome for preterm birth under each "treatment strategy" (prenatal vitamins versus no prenatal vitamins) conditional on smoking status.
    - This allows us to recover the truth, as it breaks the confounding structure.
 
-$$Y^{x=0}\sim~Bernoulli(p=expit(-2.18 +log(1.5)\times Z))$$
+$$Y^{x=0}\sim~Bernoulli(p=expit(-2.33 +log(3)\times Z))$$
 
-$$Y^{x=1}\sim~Bernoulli(p=expit(-2.18 +log(1.5)\times Z + log(0.9)\times X))$$
+$$Y^{x=1}\sim~Bernoulli(p=expit(-2.33 +log(3)\times Z + log(0.9)\times X))$$
 
 3. Generate observed treatment conditional on smoking status
 
-$$X|Z=1\sim Bernoulli(p=0.80)$$
+$$X|Z=1\sim Bernoulli(p=0.65)$$
 
-$$X|Z=0\sim Bernoulli(p=0.95)$$
+$$X|Z=0\sim Bernoulli(p=0.85)$$
 4. Assign observed outcome based on observed treatment. 
 
 $$Y = Y^{x=1}\times X + Y^{x=0}\times (1-X)$$
@@ -168,7 +168,7 @@ expit <- function(x) {
 
 # Now, create the dataset
 data1 <- dplyr::tibble(
-  # Create 500 participants
+  # Create n participants
   id = 1:n,
   
   # Randomly select smoking
@@ -194,7 +194,7 @@ data1 <- dplyr::tibble(
 
 ### Aside: deriving the balancing intercept
 
-Using R! Very helpful if we want to start moving parameters around and need to rederive the intercept.
+Using R! Very helpful if we want to start moving parameters around and need to re-derive the intercept.
 
 ```{r}
 derive_intercept <- function(py, prob_prenatal, prob_smoke, 
@@ -210,8 +210,8 @@ beta0 <- derive_intercept(
   py = 0.1, # desired risk of preterm birth
   prob_prenatal = prob_prenatal, # probability of X = 1 (prenatal vitamins) given smoking
   prob_smoke = prob_smoke, # proportion Z = 1 (smoking in the population)
-  or_smoke = or_smoke, # prenatal vitamins confers 0.9xodds of preterm
-  or_prenatal = or_prenatal # smoking confers 1.5xodds of preterm
+  or_smoke = or_smoke, # smoking confers 3x odds of preterm
+  or_prenatal = or_prenatal # prenatal vitamins confers 0.9x odds of preterm
 )
 
 round(beta0, 2)
@@ -231,14 +231,14 @@ prop.table(table(data1$smoke)) # Approximately 20% smoke = 1
 
 ```
 
-Look at the marginal distribution of prenatal vitamin supplementation. We would expect \~80% of smokers and \~95% of non-smokers to have prenatal equal to 1.
+Look at the marginal distribution of prenatal vitamin supplementation. We would expect \~65% of smokers and \~85% of non-smokers to have prenatal equal to 1.
 
 ```{r}
 # Prenatal
 smk1 <- subset(data1, smoke == 1)
 smk0 <- subset(data1, smoke == 0)
-prop.table(table(smk1$prenatal)) # Approximately 80%
-prop.table(table(smk0$prenatal)) # Approximately 95%
+prop.table(table(smk1$prenatal)) # Approximately 65%
+prop.table(table(smk0$prenatal)) # Approximately 85%
 
 ```
 
