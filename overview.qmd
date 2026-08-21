@@ -5,7 +5,7 @@ toc: true
 
 # Why Simulate?
 
-Analytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when a nuisance parameter (like a propensity score) has to be estimated rather than known. Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we — as the analyst — know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.
+Analytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when we have to deal with multiple nuisance models (e.g., propensity score, missing data, measurement error correction). Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we — as the analyst — know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.
 
 Simulation is useful whenever you need to:
 
@@ -16,7 +16,7 @@ Simulation is useful whenever you need to:
 
 # The ADEMP Framework
 
-Throughout this workshop we plan every simulation study using the **ADEMP** framework (Morris, White, and Crowther, *Statistics in Medicine*, 2019), which organizes the design of a simulation study into five components:
+Throughout this workshop we plan every simulation study using the **ADEMP** framework [Morris, White, and Crowther, *Statistics in Medicine*, 2019](https://pmc.ncbi.nlm.nih.gov/articles/PMC6492164/), which organizes the design of a simulation study into five components:
 
 | Letter | Component | Question it answers |
 |---|---|---|
@@ -26,7 +26,7 @@ Throughout this workshop we plan every simulation study using the **ADEMP** fram
 | **M** | Methods | Which estimator(s) will we apply to the simulated data? |
 | **P** | Performance measures | How will we judge whether a method worked well? |
 
-Working through the activities on this site, you will see each of these steps made explicit — first for a single simulated sample (Activity 1), then scaled up to thousands of replicates so the performance measures (bias, confidence interval coverage) can actually be evaluated (Activity 2).
+Working through the activities on this site, you will see each of these steps made explicit — first for a single simulated sample (Activity 1), then scaled up to thousands of replicates so the sampling-based performance measures can be evaluated (Activity 2).
 
 # The Running Example
 
@@ -41,21 +41,19 @@ Working through the activities on this site, you will see each of these steps ma
 knitr::include_graphics("figures/dgm_dag.png")
 ```
 
-Because we're *simulating* this scenario rather than observing it, we get to play both analyst and omniscient narrator: we choose the true causal structure and effect sizes, generate data consistent with them, and then see how well an analysis that ignores smoking (as a real analyst — who doesn't have this variable — would have to) recovers the truth.
-
 Mapped onto ADEMP, the running example looks like this:
 
 - **Aims** — 
 
-> 1. Quantify the bias in the estimated effect of prenatal vitamins on preterm birth when maternal smoking confounds the relationship but is unmeasured. 
+1. Quantify the bias in the estimated effect of prenatal vitamins on preterm birth when maternal smoking confounds the relationship but is unaccounted for in the analysis.
 
-> 2. Compare approaches (naive, robust) to standard error estimation.
+2. Compare approaches (naive, robust) to standard error estimation.
 
 
 - **Data-generating mechanism** — Simulate smoking status, both potential outcomes for preterm birth (with and without vitamins), observed vitamin use conditional on smoking, and the observed outcome — see Activity 1.
 - **Estimand** — The marginal risk difference, $E[Y^{x=1}] - E[Y^{x=0}]$: the risk of preterm birth had *everyone* taken prenatal vitamins vs. had *no one* taken them.
-- **Methods** — An unadjusted risk difference, and inverse probability of treatment weighted (IPTW) risk differences using both known and estimated weights — see Activities 1–2.
-- **Performance measures** — Bias (Activity 1), and 95% confidence interval coverage under model-based vs. sandwich standard errors (Activity 2).
+- **Methods** — An unadjusted risk difference, and inverse probability of treatment weighted (IPTW) risk differences using the known treatment weights — see Activities 1–2.
+- **Performance measures** — Bias (Activity 1), and average model-based vs. sandwich standard errors (Activity 2).
 
 # Next Steps
 

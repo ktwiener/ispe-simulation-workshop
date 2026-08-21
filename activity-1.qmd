@@ -36,18 +36,6 @@ library(purrr)
 
 We need to develop code that can generate one randomly sampled cohort based on our predefined data generating mechanism. We start with one cohort to build out this code.
 
-### Helper functions
-
-First, create "helper" functions we will use throughout our simulation.
-
-```{webr}
-# The expit function is the inverse of the log-odds. It takes in a log-odds (x), applies
-# the inverse-logit function and returns a probability
-expit <- function(x) {
-  return(exp(x) / (1 + exp(x)))
-}
-```
-
 ### Pseudo random number generation
 
 **1. Why do we want random numbers?**
@@ -111,16 +99,16 @@ n <- 2000000 # large sample size, so we can estimate bias directly (see Step 5)
 prob_smoke <- 0.2 # probability of Z = 1 (smoking)
 
 # probabilities for observed treatment
-# 95% non-smokers use prenatal vitamins
-# 80% smokers use prenatal vitamins
-prob_prenatal <- c(0.95, 0.80)
+# 85% non-smokers use prenatal vitamins
+# 65% smokers use prenatal vitamins
+prob_prenatal <- c(0.85, 0.65)
 
 # effects (log odds ratios) of smoking and prenatal vitamins on the outcome
 or_prenatal <- log(0.9) # odds ratio for prenatal vitamins on preterm birth
-or_smoke <- log(1.5)    # odds ratio for smoking on preterm birth
+or_smoke <- log(3)      # odds ratio for smoking on preterm birth
 
 # outcome model intercept (derived using the balancing intercept, see below)
-y_intercept <- -2.18
+y_intercept <- -2.33
 ```
 
 ### Create the simulated dataset using simulation parameters
@@ -133,21 +121,27 @@ $$Z\sim Bernoulli(p=0.2)$$
 
 2. Next, generate the potential outcomes. For each individual, we generate the potential outcome for preterm birth under each "treatment strategy" (prenatal vitamins vs. no prenatal vitamins) conditional on smoking status. This allows us to recover the truth, because it breaks the confounding structure.
 
-$$Y^{x=0}\sim~Bernoulli(p=expit(-2.18 +log(1.5)\times Z))$$
+$$Y^{x=0}\sim~Bernoulli(p=expit(-2.33 +log(3)\times Z))$$
 
-$$Y^{x=1}\sim~Bernoulli(p=expit(-2.18 +log(1.5)\times Z + log(0.9)\times X))$$
+$$Y^{x=1}\sim~Bernoulli(p=expit(-2.33 +log(3)\times Z + log(0.9)\times X))$$
 
 3. Generate observed treatment conditional on smoking status.
 
-$$X|Z=1\sim Bernoulli(p=0.80)$$
+$$X|Z=1\sim Bernoulli(p=0.65)$$
 
-$$X|Z=0\sim Bernoulli(p=0.95)$$
+$$X|Z=0\sim Bernoulli(p=0.85)$$
 
 4. Assign the observed outcome based on the observed treatment.
 
 $$Y = Y^{x=1}\times X + Y^{x=0}\times (1-X)$$
 
 ```{webr}
+# The expit function is the inverse of the log-odds. It takes in a log-odds (x), applies
+# the inverse-logit function and returns a probability
+expit <- function(x) {
+  return(exp(x) / (1 + exp(x)))
+}
+
 # Now, create the dataset
 data1 <- dplyr::tibble(
   # Create n participants
@@ -191,7 +185,7 @@ beta0 <- derive_intercept(
   py = 0.1, # desired risk of preterm birth
   prob_prenatal = prob_prenatal, # probability of X = 1 (prenatal vitamins) given smoking
   prob_smoke = prob_smoke, # proportion Z = 1 (smoking in the population)
-  or_smoke = or_smoke,     # smoking confers 1.5x odds of preterm
+  or_smoke = or_smoke,     # smoking confers 3x odds of preterm
   or_prenatal = or_prenatal # prenatal vitamins confers 0.9x odds of preterm
 )
 
@@ -209,14 +203,14 @@ Look at the marginal distribution of smoking. We would expect ~20% to have smoke
 prop.table(table(data1$smoke)) # Approximately 20% smoke = 1
 ```
 
-Look at the marginal distribution of prenatal vitamin supplementation. We would expect ~80% of smokers and ~95% of non-smokers to have prenatal equal to 1.
+Look at the marginal distribution of prenatal vitamin supplementation. We would expect ~65% of smokers and ~85% of non-smokers to have prenatal equal to 1.
 
 ```{webr}
 # Prenatal
 smk1 <- subset(data1, smoke == 1)
 smk0 <- subset(data1, smoke == 0)
-prop.table(table(smk1$prenatal)) # Approximately 80%
-prop.table(table(smk0$prenatal)) # Approximately 95%
+prop.table(table(smk1$prenatal)) # Approximately 65%
+prop.table(table(smk0$prenatal)) # Approximately 85%
 ```
 
 Look at the marginal probability of preterm birth. We would expect ~10% of the total population to have experienced a preterm birth.

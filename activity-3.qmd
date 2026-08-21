@@ -2,14 +2,380 @@
 title: "Activity 3"
 subtitle: "Study planning"
 toc: true
+toc-expand: 2
+format: live-html
+webr:
+  show-startup-message: false
+  packages:
+    - dplyr
+    - purrr
+    - ggplot2
+    - sandwich
 ---
 
 ::: {.callout-note appearance="minimal"}
-**Prefer to work locally?** [Download the local version](downloads/activity-3.qmd){download="activity-3.qmd"} — a standard `.qmd` file you can open in RStudio.
+**Prefer to work locally?** [Download the local version](downloads/activity-3.qmd){download="activity-3.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render`. The local version sweeps sample sizes up to 40,000 (300 replicates at each) and compares two data sources up to N = 50,000 (250 replicates at each); the browser version below uses a smaller grid (up to N = 8,000, and N = 2,000 vs. N = 8,000 for the second question) with fewer replicates, so it runs quickly here.
 :::
 
-## Coming soon
+# Using simulations to plan a study
 
-Activity 3 will walk through planning your own simulation study using the ADEMP framework introduced in [Designing a Simulation Study](overview.qmd) — starting from a research question of your choosing, through specifying a data-generating mechanism, an estimand, candidate methods, and performance measures.
+Simulation isn't only useful for evaluating a method after data are in hand — it's also useful *before* a single participant is enrolled. If we can write down a plausible data generating mechanism (DGM) for our study, we can use it to ask design questions: If our hypothesized effect is real, how precisely will we estimate it, and how often will a single study actually show a clear difference, at a given sample size?
 
-Check back closer to the workshop date, or watch the [workshop repository](https://github.com/ktwiener/ispe-simulation-workshop) for updates.
+That question runs in two directions, and both come up in practice. If we're designing a prospective study, we usually get to ask "given the effect I hypothesize, how large a sample do I need?" But when we're reusing an existing data source — a claims database, a disease registry — the sample size is fixed by the data, not by us, and the useful question flips: "given the N I have, what's the smallest effect I could realistically detect?"
+
+In this activity we revisit the prenatal vitamins / preterm birth / smoking example from Activities 1–2. Let's assume the effect is stronger (OR = 0.8) and use repeated simulation to see how precision (ASE, ESE) and our ability to detect a clear difference (power) change as sample size grows. Then we'll turn the question around and ask what effect sizes are detectable at a couple of fixed, realistic sample sizes.
+
+## Before you begin
+
+The packages below are pre-installed for this page. Run this chunk to load them into your session.
+
+```{webr}
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(sandwich)
+```
+
+## Step 1. Outline the specific aims.
+
+**Context:** We are planning a study of the effect of prenatal vitamin supplementation on the risk of preterm birth, worried about confounding by maternal smoking (unmeasured in our planned data source). Before we commit to a data source and sample size, we want to understand how sample size shapes what our study can tell us.
+
+**Simulation Objectives:**
+
+1. Assuming our hypothesized risk difference is correct, quantify how precision (ASE from both model-based and sandwich standard errors, and ESE) and the proportion of studies whose confidence interval would show a clear difference (power) change across a range of candidate sample sizes.
+
+2. Turning that question around: at a couple of fixed, realistic sample sizes (as we might encounter with an existing registry or claims database), quantify the smallest effect size we could realistically detect.
+
+## Step 2. Determine the appropriate data generating mechanism.
+
+### Helper functions
+
+First, create the "helper" functions we will use throughout our simulation.
+
+```{webr}
+# The expit function is the inverse of the log-odds. It takes in a log-odds (x),
+# applies the inverse-logit function and returns a probability
+expit <- function(x) {
+  return(exp(x) / (1 + exp(x)))
+}
+
+# The balancing intercept function, so we can re-derive the intercept whenever we
+# change other parameters
+derive_intercept <- function(py, prob_prenatal, prob_smoke,
+                             or_smoke, or_prenatal){
+
+  # marginal probability of treatment
+  prob_prenatal <- prob_prenatal[1] * (1-prob_smoke) + prob_prenatal[2] * prob_smoke
+
+  -log(1/py - 1) - or_prenatal*prob_prenatal - or_smoke*prob_smoke
+}
+```
+
+### Function for DGM
+
+This is the same DGM from Activities 1–2.
+
+```{webr}
+dgm <- function(simid = 0,
+                n = 500,
+                prob_smoke = 0.2,
+                prob_prenatal = c(0.85, 0.65),
+                or_prenatal = log(0.8),
+                or_smoke = log(3),
+                prob_preterm = 0.1){
+
+  # Dynamically derive the intercept term
+  y_intercept <- derive_intercept(py = prob_preterm,
+                                  prob_prenatal = prob_prenatal,
+                                  prob_smoke = prob_smoke,
+                                  or_smoke = or_smoke,
+                                  or_prenatal = or_prenatal)
+
+  dplyr::tibble(
+    # Simulation number
+    simid = simid,
+
+    # Create n participants
+    id = 1:n,
+
+    # Randomly select smoking
+    smoke = rbinom(n = n, size = 1, prob = prob_smoke),
+
+    # Generate potential outcome under no treatment
+    preterm_x0 = rbinom(n = n, size = 1,
+                        prob = expit(y_intercept + (or_smoke * smoke))),
+
+    # Generate potential outcome under treatment
+    preterm_x1 = rbinom(n = n, size = 1,
+                        prob = expit(y_intercept + (or_smoke * smoke) + or_prenatal)),
+
+    # Generate observed treatment conditional on smoking
+    p_prenatal = prob_prenatal[smoke + 1],
+    p_prenatal_margin = prob_prenatal[1]*(1-prob_smoke) + prob_prenatal[2]*(prob_smoke),
+    prenatal = rbinom(n = n, size = 1, prob = p_prenatal),
+
+    # Assign actual outcome conditional on observed treatment
+    preterm = preterm_x0*(1-prenatal) + preterm_x1*(prenatal),
+
+    # Known IPT weight
+    ipw = dplyr::if_else(
+      prenatal == 1,
+      p_prenatal_margin / p_prenatal,
+      p_prenatal_margin / (1 - p_prenatal)
+    )
+  )
+}
+```
+
+### Set the seed
+
+ALWAYS before any random number generation!
+
+```{webr}
+set.seed(918273)
+```
+
+### The hypothesized effect
+
+Study planning happens *before* we have data, so instead of an empirical "truth" recovered from a huge dataset, we plug in our best guess (from prior literature, pilot data, or clinical judgment) for each DGM parameter. We can still generate one very large sample under those hypothesized parameters just to confirm what marginal risk difference they imply.
+
+::: {.callout-tip appearance="minimal"}
+The local (downloads) version uses a 10,000,000-person sample for the truth. Here in the browser we use 2,000,000 — still large enough for a very precise Monte Carlo estimate, but much faster to generate in webR.
+:::
+
+```{webr}
+truth <- dgm(n = 2000000)
+true_rd <- mean(truth$preterm_x1) - mean(truth$preterm_x0)
+true_rd
+```
+
+## Step 3. Define the estimand of the analysis.
+
+As in Activities 1–2, our estimand is the marginal risk difference, $E[Y^{x=1}] - E[Y^{x=0}]$: the risk of preterm birth had *everyone* in the target population taken prenatal vitamins vs. had *no one* taken them.
+
+## Step 4. Identify the methods to be implemented in the study.
+
+We will estimate the IPT-weighted risk difference (known weights), exactly as in Activity 2. Alongside the model-based standard error, we'll also compute the robust sandwich standard error, which accounts for the fact that we're using weights.
+
+## Step 5. Specify the performance measures.
+
+**Precision.** As in Activity 2, we'll track a few measures of how precisely we can pin down the risk difference:
+
+- **ASE, model-based**: the average, across simulated samples, of the model-based standard error reported by the regression — what our software *tells us* about precision in a typical single sample.
+- **ASE, sandwich**: the same idea, but averaging the robust sandwich standard error instead.
+- **ESE** (empirical standard error): the standard deviation of the estimated risk differences across simulated samples — how much the estimate *actually* bounces around from sample to sample. If an ASE is close to the ESE, that standard error is trustworthy.
+
+**Power.** Here we define power simply in terms of the confidence interval: the proportion of simulated samples whose 95% confidence interval (built from the model-based standard error) for the risk difference excludes zero (the value that would mean "no difference").
+
+$$Power \approx P\Big(0 \notin \big[\widehat{RD} - 1.96\times\widehat{SE}(\widehat{RD}),\; \widehat{RD} + 1.96\times\widehat{SE}(\widehat{RD})\big]\Big)$$
+
+In other words: if our hypothesized effect is real, in what proportion of studies of this size would the confidence interval actually show a clear difference, rather than being consistent with "no effect"?
+
+## Simulating across a range of sample sizes
+
+### Function to simulate one sample-size scenario
+
+This function draws `nsim` replicate samples at a given `n`, fits the IPTW model to each, and returns the estimated risk difference, its model-based and sandwich standard errors, and whether the model-based 95% CI excludes zero — for every replicate.
+
+```{webr}
+run_scenario <- function(n, nsim = 100) {
+  purrr::map_dfr(1:nsim, function(i) {
+    dat <- dgm(simid = i, n = n)
+
+    unadj <- glm(preterm ~ prenatal, data = dat, family = binomial(link = "identity"))
+    adj_known <- glm(preterm ~ prenatal, data = dat,
+                 weights = ipw, family = quasibinomial(link = "identity"))
+
+    dplyr::tibble(
+      estimator = c("Unadjusted", "Adjusted (Naive SE)", "Adjusted (Robust SE)"),
+
+      # extract risk difference from the models
+      rd = c(coef(unadj)[2], coef(adj_known)[2], coef(adj_known)[2]),
+
+      # extract the standard errors from the models
+      se = c(sqrt(diag(vcov(unadj)))[2],
+             sqrt(diag(vcov(adj_known)))[2],
+             sqrt(diag(sandwich::vcovHC(adj_known)))[2])
+    )
+    }) |>
+    dplyr::mutate(
+      lcl = rd - 1.96*se,
+      ucl = rd + 1.96*se,
+      # Does this replicate's 95% CI exclude zero?
+      excludes_zero = (lcl > 0) | (ucl < 0),
+      # Does this replicate's CI include the truth?
+      includes_truth = lcl <= true_rd & true_rd <= ucl
+    )
+}
+```
+
+### Run this across a grid of candidate sample sizes
+
+::: {.callout-tip appearance="minimal"}
+The local (downloads) version sweeps N up to 40,000, with 300 replicates at each value. Here in the browser we use a smaller grid (up to N = 8,000) with 100 replicates, so the qualitative pattern is still visible but runs quickly.
+:::
+
+```{webr}
+n_grid <- c(200, 500, 1000, 2000, 4000, 8000)
+
+results_by_n <- purrr::map_dfr(n_grid, function(n) {
+  reps <- run_scenario(n, nsim = 100)
+  reps |>
+    dplyr::summarize(
+      n = n,
+      power = mean(excludes_zero),
+      ase = sqrt(mean(se^2)),
+      ese = sd(rd),
+      coverage = mean(includes_truth),
+      .by = estimator
+  )
+})
+
+results_by_n |>
+  dplyr::arrange(estimator, n)
+```
+
+### How does N affect precision (ASE, sandwich ASE, and ESE)?
+
+```{webr}
+precision_by_n <- dplyr::bind_rows(
+  results_by_n |> dplyr::filter(estimator == "Adjusted (Naive SE)") |>
+    dplyr::transmute(n, value = ase, measure = "ASE (model-based)"),
+  results_by_n |> dplyr::filter(estimator == "Adjusted (Robust SE)") |>
+    dplyr::transmute(n, value = ase, measure = "ASE (sandwich)"),
+  results_by_n |> dplyr::filter(estimator == "Unadjusted") |>
+    dplyr::transmute(n, value = ese, measure = "ESE")
+)
+
+ggplot(precision_by_n, aes(x = n, y = value, color = measure)) +
+  geom_line() +
+  geom_point() +
+  scale_x_log10(breaks = n_grid, labels = function(x) format(x, big.mark = ",", scientific = FALSE)) +
+  theme_minimal() +
+  labs(
+    x = "Sample size (N, log scale)",
+    y = "Standard error",
+    color = "",
+    title = "Precision of the risk difference estimate, by sample size",
+    subtitle = "Comparing model-based ASE, sandwich ASE, and ESE as N grows"
+  ) +
+  theme(legend.position = "bottom")
+```
+
+### How does N affect power?
+
+```{webr}
+results_by_n |>
+  dplyr::filter(estimator == "Unadjusted") |>
+  ggplot(aes(x = n, y = power)) +
+  geom_line() +
+  geom_point() +
+  scale_x_log10(breaks = n_grid, labels = function(x) format(x, big.mark = ",", scientific = FALSE)) +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_minimal() +
+  labs(
+    x = "Sample size (N, log scale)",
+    y = "Proportion of samples whose 95% CI excludes zero",
+    title = "How often would a study of this size show a clear difference?",
+    subtitle = paste0("'True' RD = ", round(true_rd, 4))
+  )
+```
+
+## Turning the question around: what effect could I detect with the data I have?
+
+So far we've asked: "given a hypothesized effect, how big a sample do I need?" But a lot of pharmacoepidemiology works in the other direction — we're reusing an existing data source (an insurance claims database, a disease registry) whose size we don't get to choose. The useful planning question becomes: "given the N I'm stuck with, what's the smallest effect I could realistically detect?"
+
+We can answer this with the exact same simulation machinery, just swapping which quantity is fixed and which one varies. Instead of looping over N at one hypothesized effect, we now fix N at a couple of realistic values and loop over a grid of hypothesized effect sizes.
+
+### Function to simulate one effect-size scenario
+
+```{webr}
+run_effect_scenario <- function(n, or_prenatal, nsim = 100) {
+  purrr::map_dfr(1:nsim, function(i) {
+    dat <- dgm(simid = i, n = n, or_prenatal = or_prenatal)
+
+    fit <- glm(preterm ~ prenatal, data = dat,
+               weights = ipw, family = quasibinomial(link = "identity"))
+
+    dplyr::tibble(
+      rd = coef(fit)[2],
+      se = sqrt(diag(sandwich::vcovHC(fit)))[2]
+    )
+  }) |>
+    dplyr::mutate(
+      excludes_zero = (rd - 1.96*se > 0) | (rd + 1.96*se < 0)
+    )
+}
+```
+
+We use the sandwich standard error directly here, since the previous section showed it's the more trustworthy of the two.
+
+### Run this across a grid of hypothesized effect sizes, at a couple of fixed sample sizes
+
+::: {.callout-tip appearance="minimal"}
+The local (downloads) version compares N = 5,000 vs. N = 50,000, with 250 replicates at each of 6 hypothesized effect sizes. Here in the browser we compare N = 2,000 vs. N = 8,000, with 100 replicates at each of 5 effect sizes.
+:::
+
+```{webr}
+# Two data sources we don't get to redesign: a modest single-site registry,
+# and a much larger insurance claims database.
+fixed_n <- c(2000, 8000)
+or_grid <- c(0.5, 0.6, 0.7, 0.8, 0.9)
+
+detectable_effect <- purrr::map_dfr(fixed_n, function(n) {
+  purrr::map_dfr(or_grid, function(orp) {
+    reps <- run_effect_scenario(n, or_prenatal = log(orp), nsim = 100)
+    dplyr::tibble(n = n, or = orp, power = mean(reps$excludes_zero))
+  })
+})
+
+detectable_effect
+```
+
+### Plot: power vs. hypothesized effect size, by sample size
+
+```{webr}
+ggplot(detectable_effect, aes(x = or, y = power, color = factor(n))) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0.8, linetype = "dashed") +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_color_manual(values = c("#1b9e77", "#7570b3"),
+                      labels = format(fixed_n, big.mark = ",", scientific = FALSE)) +
+  theme_minimal() +
+  labs(
+    x = "Hypothesized odds ratio (smaller = stronger effect)",
+    y = "Proportion of samples whose 95% CI excludes zero",
+    color = "N",
+    title = "What effect sizes could this study actually detect?",
+    subtitle = "Weaker effects (closer to OR = 1) become undetectable sooner at smaller N"
+  )
+```
+
+### The minimum detectable effect size, at each N
+
+```{webr}
+mdes <- detectable_effect |>
+  dplyr::arrange(n, power) |>
+  dplyr::summarize(
+    min_detectable_or = approx(x = power, y = or, xout = 0.8)$y,
+    .by = n
+  )
+
+mdes
+```
+
+```{webr}
+cat("At N =", format(mdes$n[1], big.mark = ","), "we could only reliably detect an odds ratio at or below about",
+    round(mdes$min_detectable_or[1], 2), "\n")
+cat("At N =", format(mdes$n[2], big.mark = ","), "that improves to about",
+    round(mdes$min_detectable_or[2], 2), "\n")
+```
+
+This is exactly the question a study built on secondary data should ask *before* committing to it: given the N the data source hands you, is the effect you actually care about even detectable?
+
+**Try it yourself:**
+
+- What would be the sample size for 80% power if there was no relationship between smoking and treatment?
+- What would be the impact to sample size if we had to incorporate another nuisance model: e.g., to correct for exposure misclassification? How could we incorporate in the simulation?
+- How does the minimum detectable effect size change if the outcome (preterm birth) is rarer, e.g. `prob_preterm = 0.03` instead of 0.1? Does a rarer outcome make weaker effects harder or easier to detect at the same N?

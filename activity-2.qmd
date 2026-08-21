@@ -1,6 +1,6 @@
 ---
 title: "Activity 2"
-subtitle: "One thousand random samples from the data generating mechanism"
+subtitle: "Repeated sampling from the data generating mechanism"
 toc: true
 toc-expand: 2
 format: live-html
@@ -13,7 +13,7 @@ webr:
 ---
 
 ::: {.callout-note appearance="minimal"}
-**Prefer to work locally?** [Download the local version](downloads/activity-2.qmd){download="activity-2.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render`. The local version uses many more replicates (10,000 vs. 500 here) for a more precise estimate of bias and coverage — the browser version is scaled down so it runs in well under a minute.
+**Prefer to work locally?** [Download the local version](downloads/activity-2.qmd){download="activity-2.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render`. The local version uses more replicates (1,000 vs. 500 here) for a more precise estimate of bias and coverage — the browser version is scaled down so it runs in well under a minute.
 :::
 
 # One Thousand Random Samples from the Data Generating Mechanism
@@ -74,11 +74,11 @@ Create a function for the DGM that we can randomly sample from. The code is near
 ```{webr}
 dgm <- function(simid = 0,
                 n = 500,
-                prob_smoke = 0.3,
-                prob_prenatal = c(0.9, 0.3),
+                prob_smoke = 0.2,
+                prob_prenatal = c(0.85, 0.65),
                 or_prenatal = log(0.9),
-                or_smoke = log(1.5),
-                prob_preterm = 0.11){
+                or_smoke = log(3),
+                prob_preterm = 0.1){
 
   # Dynamically derive the intercept term
   y_intercept <- derive_intercept(py = prob_preterm,
@@ -134,7 +134,7 @@ The local (downloads) version uses a 10,000,000-person sample for the truth. Her
 
 ```{webr}
 # Random sample for estimating the truth
-truth <- dgm(n = 2000000, prob_prenatal = c(0.9, 0.3))
+truth <- dgm(n = 2000000, prob_prenatal = c(0.85, 0.65), or_smoke = log(3))
 ```
 
 ### Resample many times
@@ -147,7 +147,7 @@ The local (downloads) version uses 10,000 replicates. Here in the browser we use
 
 ```{webr}
 # Randomly sample 500 datasets of 500 people for the analysis
-data1000 <- purrr::map(.x = 1:500, dgm, n = 500, prob_prenatal = c(0.9, 0.3))
+data1000 <- purrr::map(.x = 1:500, dgm, n = 500, prob_prenatal = c(0.85, 0.65), or_smoke = log(3))
 ```
 
 ## Step 3. Define the estimand of the analysis.
