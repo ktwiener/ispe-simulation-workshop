@@ -9,6 +9,7 @@ webr:
   packages:
     - dplyr
     - purrr
+    - ggplot2
     - sandwich
 ---
 
@@ -29,6 +30,7 @@ The packages below are pre-installed for this page. Run this chunk to load them 
 ```{webr}
 library(dplyr)
 library(purrr)
+library(ggplot2)
 library(sandwich)
 ```
 
@@ -156,46 +158,56 @@ The slides illustrate how to derive the truth mathematically. However, this is s
 
 ```{webr}
 # Estimate the "true" RD using potential outcomes -- no complex analysis needed!
-true_rd <- mean(truth$preterm_x1) - mean(truth$preterm_x0)
-true_rd
+true1 <- mean(truth$preterm_x1)
+true0 <- mean(truth$preterm_x0)
+true_rd <- true1 - true0
+
+dplyr::tibble(
+  Estimator = "Truth",
+  `Risk prenatal` = true1,
+  `Risk, no prenatal` = true0,
+  `Risk Diff` = true_rd
+) |>
+  dplyr::mutate(
+    dplyr::across(-Estimator, \(x) round(100*x, 1))
+  )
 ```
 
 ## Step 4. Identify the methods to be implemented in the study.
 
-We are comparing three estimators:
+We are comparing two estimators:
 
 1. Unweighted risk difference
 2. IPT weighted risk difference (known weights)
-3. IPT weighted risk difference (estimated weights)
 
-AND two approaches for standard error estimation:
+Within the weighted risk difference, we are further comparing two approaches for standard error estimation:
 
 1. Model-based SEs
 2. Sandwich estimator for SEs
 
-### First, add known and estimated IPT weights to each of the simulation samples.
+### Add IPT weights to the samples
+
+We add the "known" treatment weight to each sample — known because we set the true treatment-assignment probabilities for the simulation. In a real observational study we wouldn't know these; we'd have to estimate a propensity score and construct weights from that instead.
 
 ```{webr}
 data1000 <- purrr::map(data1000,
                        function(x){
                          x |>
                            dplyr::mutate(
-                             est_prenatal_margin = mean(prenatal)
-                           ) |>
-                           dplyr::mutate(
+                             # Known weight: numerator is the marginal probability
+                             # of treatment, denominator is the probability of the
+                             # observed treatment given smoking
                              ipw = if_else(prenatal == 1,
                                            p_prenatal_margin/p_prenatal,
-                                           p_prenatal_margin/(1-p_prenatal)),
-                             ipw_est = if_else(prenatal == 1,
-                                               est_prenatal_margin/mean(prenatal),
-                                               (1-est_prenatal_margin)/(1-mean(prenatal))),
-                             .by = smoke
+                                           p_prenatal_margin/(1-p_prenatal))
                              )
                          }
                        )
 ```
 
-### Now, within each sample, estimate the risk difference and standard errors for each approach.
+### Sample-specific analysis
+
+Within each sample, we want to estimate the unadjusted risk difference and the weighted risk difference and their associated model-based standard errors. Additionally, for the *weighted* risk difference we will estimate the robust sandwich standard errors to account for the weights.
 
 ```{webr}
 rds_ses <- purrr::map_dfr(
@@ -204,51 +216,133 @@ rds_ses <- purrr::map_dfr(
     unadj <- glm(preterm ~ prenatal, data = x, family = binomial(link = "identity"))
     adj_known <- glm(preterm ~ prenatal, data = x,
                  weights = ipw, family = quasibinomial(link = "identity"))
-    adj_est <- glm(preterm ~ prenatal, data = x,
-                 weights = ipw_est, family = quasibinomial(link = "identity"))
 
     dplyr::tibble(
-      estimator = c("Unadjusted", "Adjusted (Known)", "Adjusted (Estimated)"),
-
+      estimator = c("Unadjusted", "Adjusted (Naive SE)", "Adjusted (Robust SE)"),
+      # risk under no treatment
+      r0 = c(coef(unadj)[1], coef(adj_known)[1], coef(adj_known)[1]),
       # extract risk difference from the models
-      rd = c(coef(unadj)[2], coef(adj_known)[2], coef(adj_est)[2]),
+      rd = c(coef(unadj)[2], coef(adj_known)[2], coef(adj_known)[2]),
+      # risk under treatment
+      r1 = rd + r0,
 
       # extract the standard errors from the models
-      model_se = c(sqrt(diag(vcov(unadj)))[2],
-                    sqrt(diag(vcov(adj_known)))[2],
-                    sqrt(diag(vcov(adj_est)))[2]),
-
-      # use the sandwich package to get the sandwich-based standard errors.
-      # type = "HC3" applies a finite-sample correction (a leverage-weighted
-      # jackknife-style inflation) rather than the uncorrected HC0 sandwich,
-      # which is known to be biased downward at moderate sample sizes.
-      sandwich_se = c( sqrt(diag(sandwich::vcovHC(unadj, type = "HC3")))[2],
-                       sqrt(diag(sandwich::vcovHC(adj_known, type = "HC3")))[2],
-                       sqrt(diag(sandwich::vcovHC(adj_est, type = "HC3")))[2])
+      se = c(sqrt(diag(vcov(unadj)))[2],
+             sqrt(diag(vcov(adj_known)))[2],
+             sqrt(diag(sandwich::vcovHC(adj_known)))[2])
     )
   }
-)
+) |>
+  dplyr::select(estimator, r0, r1, rd, se)
 ```
 
-### Next, calculate whether the true RD lies within the calculated confidence intervals for each sample, and calculate the difference between the estimated RD and true RD ("error") for each sample.
+## Step 5: Performance measures
+
+### Sample-specific set-up
+
+To estimate bias and coverage, we need to do an additional data manipulation to the results from each simulation sample.
+
+**95% confidence interval coverage** is the proportion of times the true risk difference is captured within the 95% confidence interval. Within each sample, we create a binary variable that is 1 if the confidence interval from that sample contains the true risk difference and 0 if it does not:
+
+$$I(\hat{\theta}-1.96\times\hat{SE}(\hat{\theta}) \leq \theta \leq \hat{\theta}+1.96\times\hat{SE}(\hat{\theta}) )$$
+
+where $I( )$ is the indicator function ($=1$ if expression in parenthesis is true, $=0$ if false)
+
+**Bias** is mean error across simulations. Within each sample, we calculate error as:
+
+$$\hat{\theta}-\theta$$
 
 ```{webr}
 rds_ses <- rds_ses |>
   dplyr::mutate(
+    # calculate error (estimated rd - true rd)
     error = rd - true_rd,
-    model_coverage = (true_rd >= (rd - 1.96*model_se)) &  (true_rd <= (rd + 1.96*model_se)),
-    sandwich_coverage = (true_rd >= (rd - 1.96*sandwich_se)) &  (true_rd <= (rd + 1.96*sandwich_se))
+    # does the true rd fall within the estimated 95% CI?
+    model_coverage = (true_rd >= (rd - 1.96*se)) &  (true_rd <= (rd + 1.96*se))
   )
+```
 
+### Estimate performance measures
+
+Summary statistics of the simulation-specific values we already estimated
+
+```{webr}
 measures <- rds_ses |>
   dplyr::summarize(
+    exp_r1 = mean(r1),
+    exp_r0 = mean(r0),
+    exp_rd = mean(rd),
     bias = mean(error),
+    ese = sd(rd),
+    ase = sqrt(mean(se^2)),
     model_coverage = mean(model_coverage),
-    sandwich_coverage = mean(sandwich_coverage),
     .by = estimator
   )
 
-measures
+measures |>
+  dplyr::mutate(
+    dplyr::across(-estimator, \(x) round(100*x, 1))
+  )
 ```
 
-How does bias compare across the unadjusted, known-weight, and estimated-weight estimators? Is coverage at (or near) the nominal 95% for both SE approaches, or does one look conservative (coverage above 95%) while the other looks anticonservative (coverage below 95%)? Try re-running the resampling chunk with more replicates — how much does the coverage estimate itself move around?
+## Plots
+
+Below are some ideas for presenting simulation results.
+
+Well, the first one is more just to get a feel for what the sampling distribution looks like.
+
+```{webr}
+rds_ses |>
+  dplyr::filter(estimator == "Unadjusted") |>
+  ggplot(aes(rd, after_stat(density))) +
+  geom_histogram(bins = 50, fill = "lightblue") +
+  geom_histogram(data = rds_ses[rds_ses$estimator == "Adjusted (Naive SE)",],
+                 bins = 50, fill = "orange", alpha = 0.5) +
+  theme_minimal() +
+  geom_vline(xintercept = true_rd) +
+  labs(
+    title = "Sampling distribution of the risk difference",
+    subtitle = "Unadjusted (blue) vs. Adjusted (orange)",
+    x = "Estimator",
+    y = "Density"
+  )
+```
+
+The boxplot is a nice way to visualize bias and spread all in one figure. This shows bias and ESE -- so doesn't give a good sense of how the standard error estimators are doing.
+
+```{webr}
+rds_ses |>
+  dplyr::filter(estimator != "Adjusted (Robust SE)") |>
+  ggplot(aes(x = estimator, y = error, color = estimator)) +
+  geom_boxplot(show.legend = FALSE) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") +
+  theme_minimal() +
+  labs(x = "",
+       y = "Error",
+       title = "Distribution of error (estimated RD - true RD) by estimation approach",
+       subtitle = "Black diamonds indicate mean error (bias)")
+```
+
+Below shows how coverage is performing in each simulation. Unadjusted is doing the worst (the most red/pink), whereas the adjusted with robust SE is doing the best (the most blue).
+
+```{webr}
+rds_ses |>
+  dplyr::mutate(
+    lcl = rd - 1.96*se,
+    ucl = rd + 1.96*se
+  ) |>
+  dplyr::arrange(lcl) |>
+  dplyr::mutate(id = row_number(), .by = estimator) |>
+  ggplot(aes(y = id, x = lcl, xend = ucl, color = model_coverage)) +
+  geom_segment(show.legend = FALSE) +
+  geom_vline(xintercept = true_rd, linetype = "dashed") +
+  facet_wrap(~estimator) +
+  theme_minimal() +
+  theme(axis.text.y = element_blank()) +
+  labs(y = "Simulation", x = "95% confidence interval",
+       color = "",
+       title = "95% confidence interval coverage across simulations",
+       subtitle = "Blue = interval contains the true risk difference")
+```
+
+Is coverage at (or near) the nominal 95% for both SE approaches, or does one look conservative (coverage above 95%) while the other looks anticonservative (coverage below 95%)? Try re-running the resampling chunk with more replicates — how much does the coverage estimate itself move around?
