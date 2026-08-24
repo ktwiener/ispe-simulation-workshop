@@ -245,7 +245,29 @@
     "href": "activity-2.html#step-4.-identify-the-methods-to-be-implemented-in-the-study.",
     "title": "Activity 2",
     "section": "Step 4. Identify the methods to be implemented in the study.",
-    "text": "Step 4. Identify the methods to be implemented in the study.\nWe are comparing three estimators:\n\nUnweighted risk difference\nIPT weighted risk difference (known weights)\nIPT weighted risk difference (estimated weights)\n\nAND two approaches for standard error estimation:\n\nModel-based SEs\nSandwich estimator for SEs\n\n\nFirst, add known and estimated IPT weights to each of the simulation samples.\n\n\n\n\n\n\n\n\nNow, within each sample, estimate the risk difference and standard errors for each approach.\n\n\n\n\n\n\n\n\nNext, calculate whether the true RD lies within the calculated confidence intervals for each sample, and calculate the difference between the estimated RD and true RD (“error”) for each sample.\n\n\n\n\n\n\nHow does bias compare across the unadjusted, known-weight, and estimated-weight estimators? Is coverage at (or near) the nominal 95% for both SE approaches, or does one look conservative (coverage above 95%) while the other looks anticonservative (coverage below 95%)? Try re-running the resampling chunk with more replicates — how much does the coverage estimate itself move around?",
+    "text": "Step 4. Identify the methods to be implemented in the study.\nWe are comparing two estimators:\n\nUnweighted risk difference\nIPT weighted risk difference (known weights)\n\nWithin the weighted risk difference, we are further comparing two approaches for standard error estimation:\n\nModel-based SEs\nSandwich estimator for SEs\n\n\nAdd IPT weights to the samples\nWe add the “known” treatment weight to each sample — known because we set the true treatment-assignment probabilities for the simulation. In a real observational study we wouldn’t know these; we’d have to estimate a propensity score and construct weights from that instead.\n\n\n\n\n\n\n\n\nSample-specific analysis\nWithin each sample, we want to estimate the unadjusted risk difference and the weighted risk difference and their associated model-based standard errors. Additionally, for the weighted risk difference we will estimate the robust sandwich standard errors to account for the weights.",
+    "crumbs": [
+      "Activities",
+      "Activity 2"
+    ]
+  },
+  {
+    "objectID": "activity-2.html#step-5-performance-measures",
+    "href": "activity-2.html#step-5-performance-measures",
+    "title": "Activity 2",
+    "section": "Step 5: Performance measures",
+    "text": "Step 5: Performance measures\n\nSample-specific set-up\nTo estimate bias and coverage, we need to do an additional data manipulation to the results from each simulation sample.\n95% confidence interval coverage is the proportion of times the true risk difference is captured within the 95% confidence interval. Within each sample, we create a binary variable that is 1 if the confidence interval from that sample contains the true risk difference and 0 if it does not:\n\\[I(\\hat{\\theta}-1.96\\times\\hat{SE}(\\hat{\\theta}) \\leq \\theta \\leq \\hat{\\theta}+1.96\\times\\hat{SE}(\\hat{\\theta}) )\\]\nwhere \\(I( )\\) is the indicator function (\\(=1\\) if expression in parenthesis is true, \\(=0\\) if false)\nBias is mean error across simulations. Within each sample, we calculate error as:\n\\[\\hat{\\theta}-\\theta\\]\n\n\n\n\n\n\n\n\nEstimate performance measures\nSummary statistics of the simulation-specific values we already estimated",
+    "crumbs": [
+      "Activities",
+      "Activity 2"
+    ]
+  },
+  {
+    "objectID": "activity-2.html#plots",
+    "href": "activity-2.html#plots",
+    "title": "Activity 2",
+    "section": "Plots",
+    "text": "Plots\nBelow are some ideas for presenting simulation results.\nWell, the first one is more just to get a feel for what the sampling distribution looks like.\n\n\n\n\n\n\nThe boxplot is a nice way to visualize bias and spread all in one figure. This shows bias and ESE – so doesn’t give a good sense of how the standard error estimators are doing.\n\n\n\n\n\n\nBelow shows how coverage is performing in each simulation. Unadjusted is doing the worst (the most red/pink), whereas the adjusted with robust SE is doing the best (the most blue).\n\n\n\n\n\n\nIs coverage at (or near) the nominal 95% for both SE approaches, or does one look conservative (coverage above 95%) while the other looks anticonservative (coverage below 95%)? Try re-running the resampling chunk with more replicates — how much does the coverage estimate itself move around?",
     "crumbs": [
       "Activities",
       "Activity 2"
