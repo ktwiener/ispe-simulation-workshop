@@ -14,7 +14,7 @@ When designing a prospective study, we typically ask "given the effect I hypothe
 
 But when we're using secondary data — a claims database, a disease registry — the sample size is set by the data. 
 
-In this activity we revisit the prenatal vitamins / preterm birth / smoking example from Activities 1–2. We make the effect stronger (OR = 0.8) and use simulation to see how precision (ASE, ESE) and our ability to detect a clear difference (power) change as sample size grows, and what the resulting confidence intervals look like. Then we'll turn the question around and ask what effect sizes are detectable at a fixed sample size.
+In this activity we revisit the prenatal vitamins / preterm birth / smoking example from Activities 1–2.
 
 ## Before you begin
 
