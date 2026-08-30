@@ -14,7 +14,7 @@
     "href": "activity-3.html",
     "title": "Activity 3",
     "section": "",
-    "text": "Prefer to work locally? Download the local version — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render. The local version sweeps sample sizes up to 40,000 (300 replicates at each) and compares two data sources up to N = 50,000 (250 replicates at each); the browser version below uses a smaller grid (up to N = 8,000, and N = 2,000 vs. N = 8,000 for the second question) with fewer replicates, so it runs quickly here.",
+    "text": "Prefer to work locally? Download the local version — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render — or a PDF with the code and output already rendered. The local version sweeps sample sizes up to 40,000 (300 replicates at each) and compares two data sources, N = 1,000 vs. N = 10,000 (250 replicates at each of 6 hypothesized risk differences); the browser version below uses a smaller grid (up to N = 8,000 for the first question, and N = 1,000 vs. N = 4,000 for the second) with fewer replicates, so it runs quickly here.",
     "crumbs": [
       "Activities",
       "Activity 3"
@@ -47,7 +47,7 @@
     "href": "activity-3.html#step-2.-determine-the-appropriate-data-generating-mechanism.",
     "title": "Activity 3",
     "section": "Step 2. Determine the appropriate data generating mechanism.",
-    "text": "Step 2. Determine the appropriate data generating mechanism.\n\nHelper functions\nFirst, create the “helper” functions we will use throughout our simulation.\n\n\n\n\n\n\n\n\nFunction for DGM\nThis is the same DGM from Activities 1–2.\n\n\n\n\n\n\n\n\nSet the seed\nALWAYS before any random number generation!\n\n\n\n\n\n\n\n\nThe hypothesized effect\nStudy planning happens before we have data, so instead of an empirical “truth” recovered from a huge dataset, we plug in our best guess (from prior literature, pilot data, or clinical judgment) for each DGM parameter. We can still generate one very large sample under those hypothesized parameters just to confirm what marginal risk difference they imply.\n\n\n\n\n\n\nThe local (downloads) version uses a 10,000,000-person sample for the truth. Here in the browser we use 2,000,000 — still large enough for a very precise Monte Carlo estimate, but much faster to generate in webR.",
+    "text": "Step 2. Determine the appropriate data generating mechanism.\n\nHelper functions\nFirst, create the “helper” functions we will use throughout our simulation.\n\n\n\n\n\n\n\n\nFunction for DGM\nThis is the same DGM from Activities 1–2.\n\n\n\n\n\n\n\n\nSet the seed\nALWAYS before any random number generation!\n\n\n\n\n\n\n\n\nThe hypothesized effect\nStudy planning mainly before we have data, so instead of an empirical “truth” recovered from a huge dataset, we plug in our best guess (from prior literature, pilot data, or clinical judgment) for each DGM parameter. We can still generate one very large sample under those hypothesized parameters just to confirm what marginal risk difference they imply.\n\n\n\n\n\n\nThe local (downloads) version uses a 10,000,000-person sample for the truth. Here in the browser we use 2,000,000 — still large enough for a very precise Monte Carlo estimate, but much faster to generate in webR.",
     "crumbs": [
       "Activities",
       "Activity 3"
@@ -98,11 +98,11 @@
     ]
   },
   {
-    "objectID": "activity-3.html#turning-the-question-around-what-effect-could-i-detect-with-the-data-i-have",
-    "href": "activity-3.html#turning-the-question-around-what-effect-could-i-detect-with-the-data-i-have",
+    "objectID": "activity-3.html#what-effect-could-i-detect-with-the-data-i-have",
+    "href": "activity-3.html#what-effect-could-i-detect-with-the-data-i-have",
     "title": "Activity 3",
-    "section": "Turning the question around: what effect could I detect with the data I have?",
-    "text": "Turning the question around: what effect could I detect with the data I have?\nSo far we’ve asked: “given a hypothesized effect, how big a sample do I need?” But a lot of pharmacoepidemiology works in the other direction — we’re reusing an existing data source (an insurance claims database, a disease registry) whose size we don’t get to choose. The useful planning question becomes: “given the N I’m stuck with, what’s the smallest effect I could realistically detect?”\nWe can answer this with the exact same simulation machinery, just swapping which quantity is fixed and which one varies. Instead of looping over N at one hypothesized effect, we now fix N at a couple of realistic values and loop over a grid of hypothesized effect sizes.\n\nFunction to simulate one effect-size scenario\n\n\n\n\n\n\nWe use the sandwich standard error directly here, since the previous section showed it’s the more trustworthy of the two.\n\n\nRun this across a grid of hypothesized effect sizes, at a couple of fixed sample sizes\n\n\n\n\n\n\nThe local (downloads) version compares N = 5,000 vs. N = 50,000, with 250 replicates at each of 6 hypothesized effect sizes. Here in the browser we compare N = 2,000 vs. N = 8,000, with 100 replicates at each of 5 effect sizes.\n\n\n\n\n\n\n\n\n\n\n\nPlot: power vs. hypothesized effect size, by sample size\n\n\n\n\n\n\n\n\nThe minimum detectable effect size, at each N\n\n\n\n\n\n\n\n\n\n\n\n\nThis is exactly the question a study built on secondary data should ask before committing to it: given the N the data source hands you, is the effect you actually care about even detectable?\nTry it yourself:\n\nWhat would be the sample size for 80% power if there was no relationship between smoking and treatment?\nWhat would be the impact to sample size if we had to incorporate another nuisance model: e.g., to correct for exposure misclassification? How could we incorporate in the simulation?\nHow does the minimum detectable effect size change if the outcome (preterm birth) is rarer, e.g. prob_preterm = 0.03 instead of 0.1? Does a rarer outcome make weaker effects harder or easier to detect at the same N?",
+    "section": "What effect could I detect with the data I have?",
+    "text": "What effect could I detect with the data I have?\nSo far we’ve asked: “given a hypothesized effect, how big a sample do I need?” But in pharmacoepidemiology we’re typically using an existing data source (an insurance claims database, a disease registry). The useful planning question becomes: “given the N in this data source (and my design choices), what’s the smallest effect I could realistically detect?”\nWe can answer this with the exact same simulation machinery, just swapping which quantity is fixed and which one varies.\nInstead of looping over N at one hypothesized effect, we now fix N and loop over a grid of hypothesized effect sizes. We can also change the confounding parameters to see how that impacts our precision.\n\nFunction to simulate one effect-size scenario\n\n\n\n\n\n\nWe use the sandwich standard error directly here, since we know it more accurately estimates the empirical standard error.\n\n\nTranslating a hypothesized risk difference into the DGM\nOur DGM generates the treatment effect on the log-odds scale (or_prenatal), but the effect we actually want to hypothesize about is the marginal risk difference. So first we write down, analytically, the exact marginal risk difference implied by a given or_prenatal (no simulation noise, since smoke only takes two values), then invert that numerically to find the or_prenatal that produces whatever risk difference we want to hypothesize.\n\n\n\n\n\n\n\n\nRun this across a grid of hypothesized effect sizes, at a couple of fixed sample sizes\n\n\n\n\n\n\nThe local (downloads) version compares N = 1,000 vs. N = 10,000, with 250 replicates at each of 6 hypothesized risk differences. Here in the browser we compare N = 1,000 vs. N = 4,000, with 100 replicates at each.\n\n\n\n\n\n\n\n\n\n\n\nPlot: power vs. hypothesized effect size, by sample size\n\n\n\n\n\n\n\n\nThe minimum detectable effect size, at each N",
     "crumbs": [
       "Activities",
       "Activity 3"
@@ -113,7 +113,7 @@
     "href": "activity-1.html",
     "title": "Activity 1",
     "section": "",
-    "text": "Prefer to work locally? Download the local version — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render. The local version uses a sample of 10,000,000 to estimate bias — the browser version is scaled down to 2,000,000 so it runs quickly here.\nIn this activity, we illustrate the key steps first for one single random sample from the data generating mechanism (DGM). Activity 2 will adapt this for 1,000 random samples.",
+    "text": "Prefer to work locally? Download the local version — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render — or a PDF with the code and output already rendered. The local version uses a sample of 10,000,000 to estimate bias — the browser version is scaled down to 2,000,000 so it runs quickly here.\nIn this activity, we illustrate the key steps first for one single random sample from the data generating mechanism (DGM). Activity 2 will adapt this for 1,000 random samples.",
     "crumbs": [
       "Activities",
       "Activity 1"
@@ -190,7 +190,7 @@
     "href": "activity-2.html",
     "title": "Activity 2",
     "section": "",
-    "text": "Prefer to work locally? Download the local version — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render. The local version uses more replicates (1,000 vs. 500 here) for a more precise estimate of bias and coverage — the browser version is scaled down so it runs in well under a minute.",
+    "text": "Prefer to work locally? Download the local version — a standard .qmd file with regular R chunks you can run in RStudio or with quarto render — or a PDF with the code and output already rendered. The local version uses more replicates (1,000 vs. 500 here) for a more precise estimate of bias and coverage — the browser version is scaled down so it runs in well under a minute.",
     "crumbs": [
       "Activities",
       "Activity 2"

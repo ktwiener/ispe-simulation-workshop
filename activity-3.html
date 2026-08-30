@@ -216,9 +216,10 @@ window.Quarto = {
   <li><a href="#how-does-n-affect-precision-ase-sandwich-ase-and-ese" id="toc-how-does-n-affect-precision-ase-sandwich-ase-and-ese" class="nav-link" data-scroll-target="#how-does-n-affect-precision-ase-sandwich-ase-and-ese">How does N affect precision (ASE, sandwich ASE, and ESE)?</a></li>
   <li><a href="#how-does-n-affect-power" id="toc-how-does-n-affect-power" class="nav-link" data-scroll-target="#how-does-n-affect-power">How does N affect power?</a></li>
   </ul></li>
-  <li><a href="#turning-the-question-around-what-effect-could-i-detect-with-the-data-i-have" id="toc-turning-the-question-around-what-effect-could-i-detect-with-the-data-i-have" class="nav-link" data-scroll-target="#turning-the-question-around-what-effect-could-i-detect-with-the-data-i-have">Turning the question around: what effect could I detect with the data I have?</a>
+  <li><a href="#what-effect-could-i-detect-with-the-data-i-have" id="toc-what-effect-could-i-detect-with-the-data-i-have" class="nav-link" data-scroll-target="#what-effect-could-i-detect-with-the-data-i-have">What effect could I detect with the data I have?</a>
   <ul class="collapse">
   <li><a href="#function-to-simulate-one-effect-size-scenario" id="toc-function-to-simulate-one-effect-size-scenario" class="nav-link" data-scroll-target="#function-to-simulate-one-effect-size-scenario">Function to simulate one effect-size scenario</a></li>
+  <li><a href="#translating-a-hypothesized-risk-difference-into-the-dgm" id="toc-translating-a-hypothesized-risk-difference-into-the-dgm" class="nav-link" data-scroll-target="#translating-a-hypothesized-risk-difference-into-the-dgm">Translating a hypothesized risk difference into the DGM</a></li>
   <li><a href="#run-this-across-a-grid-of-hypothesized-effect-sizes-at-a-couple-of-fixed-sample-sizes" id="toc-run-this-across-a-grid-of-hypothesized-effect-sizes-at-a-couple-of-fixed-sample-sizes" class="nav-link" data-scroll-target="#run-this-across-a-grid-of-hypothesized-effect-sizes-at-a-couple-of-fixed-sample-sizes">Run this across a grid of hypothesized effect sizes, at a couple of fixed sample sizes</a></li>
   <li><a href="#plot-power-vs.-hypothesized-effect-size-by-sample-size" id="toc-plot-power-vs.-hypothesized-effect-size-by-sample-size" class="nav-link" data-scroll-target="#plot-power-vs.-hypothesized-effect-size-by-sample-size">Plot: power vs.&nbsp;hypothesized effect size, by sample size</a></li>
   <li><a href="#the-minimum-detectable-effect-size-at-each-n" id="toc-the-minimum-detectable-effect-size-at-each-n" class="nav-link" data-scroll-target="#the-minimum-detectable-effect-size-at-each-n">The minimum detectable effect size, at each N</a></li>
@@ -256,15 +257,16 @@ window.Quarto = {
 <i class="callout-icon no-icon"></i>
 </div>
 <div class="callout-body-container">
-<p><strong>Prefer to work locally?</strong> <a href="downloads/activity-3.qmd" download="activity-3.qmd">Download the local version</a> — a standard <code>.qmd</code> file with regular R chunks you can run in RStudio or with <code>quarto render</code>. The local version sweeps sample sizes up to 40,000 (300 replicates at each) and compares two data sources up to N = 50,000 (250 replicates at each); the browser version below uses a smaller grid (up to N = 8,000, and N = 2,000 vs.&nbsp;N = 8,000 for the second question) with fewer replicates, so it runs quickly here.</p>
+<p><strong>Prefer to work locally?</strong> <a href="downloads/activity-3.qmd" download="activity-3.qmd">Download the local version</a> — a standard <code>.qmd</code> file with regular R chunks you can run in RStudio or with <code>quarto render</code> — or a <a href="downloads/activity-3.pdf">PDF</a> with the code and output already rendered. The local version sweeps sample sizes up to 40,000 (300 replicates at each) and compares two data sources, N = 1,000 vs.&nbsp;N = 10,000 (250 replicates at each of 6 hypothesized risk differences); the browser version below uses a smaller grid (up to N = 8,000 for the first question, and N = 1,000 vs.&nbsp;N = 4,000 for the second) with fewer replicates, so it runs quickly here.</p>
 </div>
 </div>
 </div>
 <section id="using-simulations-to-plan-a-study" class="level1">
 <h1>Using simulations to plan a study</h1>
-<p>Simulation isn’t only useful for evaluating a method after data are in hand — it’s also useful <em>before</em> a single participant is enrolled. If we can write down a plausible data generating mechanism (DGM) for our study, we can use it to ask design questions: If our hypothesized effect is real, how precisely will we estimate it, and how often will a single study actually show a clear difference, at a given sample size?</p>
-<p>That question runs in two directions, and both come up in practice. If we’re designing a prospective study, we usually get to ask “given the effect I hypothesize, how large a sample do I need?” But when we’re reusing an existing data source — a claims database, a disease registry — the sample size is fixed by the data, not by us, and the useful question flips: “given the N I have, what’s the smallest effect I could realistically detect?”</p>
-<p>In this activity we revisit the prenatal vitamins / preterm birth / smoking example from Activities 1–2. Let’s assume the effect is stronger (OR = 0.8) and use repeated simulation to see how precision (ASE, ESE) and our ability to detect a clear difference (power) change as sample size grows. Then we’ll turn the question around and ask what effect sizes are detectable at a couple of fixed, realistic sample sizes.</p>
+<p>If we can posit a plausible data generating mechanism (DGM) for our study, we can use it to ask design questions.</p>
+<p>When designing a prospective study, we typically ask “given the effect I hypothesize, how large a sample do I need?”</p>
+<p>But when we’re using secondary data — a claims database, a disease registry — the sample size is set by the data.</p>
+<p>In this activity we revisit the prenatal vitamins / preterm birth / smoking example from Activities 1–2. We make the effect stronger (OR = 0.8) and use simulation to see how precision (ASE, ESE) and our ability to detect a clear difference (power) change as sample size grows, and what the resulting confidence intervals look like. Then we’ll turn the question around and ask what effect sizes are detectable at a fixed sample size.</p>
 <section id="before-you-begin" class="level2">
 <h2 class="anchored" data-anchor-id="before-you-begin">Before you begin</h2>
 <p>The packages below are pre-installed for this page. Run this chunk to load them into your session.</p>
@@ -326,7 +328,7 @@ eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoic2V0LnNlZWQoOTE4MjczKSJ9
 </section>
 <section id="the-hypothesized-effect" class="level3">
 <h3 class="anchored" data-anchor-id="the-hypothesized-effect">The hypothesized effect</h3>
-<p>Study planning happens <em>before</em> we have data, so instead of an empirical “truth” recovered from a huge dataset, we plug in our best guess (from prior literature, pilot data, or clinical judgment) for each DGM parameter. We can still generate one very large sample under those hypothesized parameters just to confirm what marginal risk difference they imply.</p>
+<p>Study planning mainly <em>before</em> we have data, so instead of an empirical “truth” recovered from a huge dataset, we plug in our best guess (from prior literature, pilot data, or clinical judgment) for each DGM parameter. We can still generate one very large sample under those hypothesized parameters just to confirm what marginal risk difference they imply.</p>
 <div class="callout callout-style-simple callout-tip no-icon">
 <div class="callout-body d-flex">
 <div class="callout-icon-container">
@@ -425,10 +427,11 @@ eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoicmVzdWx0c19ieV9uIHw+XG4g
 </div>
 </section>
 </section>
-<section id="turning-the-question-around-what-effect-could-i-detect-with-the-data-i-have" class="level2">
-<h2 class="anchored" data-anchor-id="turning-the-question-around-what-effect-could-i-detect-with-the-data-i-have">Turning the question around: what effect could I detect with the data I have?</h2>
-<p>So far we’ve asked: “given a hypothesized effect, how big a sample do I need?” But a lot of pharmacoepidemiology works in the other direction — we’re reusing an existing data source (an insurance claims database, a disease registry) whose size we don’t get to choose. The useful planning question becomes: “given the N I’m stuck with, what’s the smallest effect I could realistically detect?”</p>
-<p>We can answer this with the exact same simulation machinery, just swapping which quantity is fixed and which one varies. Instead of looping over N at one hypothesized effect, we now fix N at a couple of realistic values and loop over a grid of hypothesized effect sizes.</p>
+<section id="what-effect-could-i-detect-with-the-data-i-have" class="level2">
+<h2 class="anchored" data-anchor-id="what-effect-could-i-detect-with-the-data-i-have">What effect could I detect with the data I have?</h2>
+<p>So far we’ve asked: “given a hypothesized effect, how big a sample do I need?” But in pharmacoepidemiology we’re typically using an existing data source (an insurance claims database, a disease registry). The useful planning question becomes: “given the N in this data source (and my design choices), what’s the smallest effect I could realistically detect?”</p>
+<p>We can answer this with the exact same simulation machinery, just swapping which quantity is fixed and which one varies.</p>
+<p>Instead of looping over N at one hypothesized effect, we now fix N and loop over a grid of hypothesized effect sizes. We can also change the confounding parameters to see how that impacts our precision.</p>
 <section id="function-to-simulate-one-effect-size-scenario" class="level3">
 <h3 class="anchored" data-anchor-id="function-to-simulate-one-effect-size-scenario">Function to simulate one effect-size scenario</h3>
 <div>
@@ -436,10 +439,22 @@ eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoicmVzdWx0c19ieV9uIHw+XG4g
 
 </div>
 <script type="webr-10-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoicnVuX2VmZmVjdF9zY2VuYXJpbyA8LSBmdW5jdGlvbihuLCBvcl9wcmVuYXRhbCwgbnNpbSA9IDEwMCkge1xuICBwdXJycjo6bWFwX2RmcigxOm5zaW0sIGZ1bmN0aW9uKGkpIHtcbiAgICBkYXQgPC0gZGdtKHNpbWlkID0gaSwgbiA9IG4sIG9yX3ByZW5hdGFsID0gb3JfcHJlbmF0YWwpXG5cbiAgICBmaXQgPC0gZ2xtKHByZXRlcm0gfiBwcmVuYXRhbCwgZGF0YSA9IGRhdCxcbiAgICAgICAgICAgICAgIHdlaWdodHMgPSBpcHcsIGZhbWlseSA9IHF1YXNpYmlub21pYWwobGluayA9IFwiaWRlbnRpdHlcIikpXG5cbiAgICBkcGx5cjo6dGliYmxlKFxuICAgICAgcmQgPSBjb2VmKGZpdClbMl0sXG4gICAgICBzZSA9IHNxcnQoZGlhZyhzYW5kd2ljaDo6dmNvdkhDKGZpdCkpKVsyXVxuICAgIClcbiAgfSkgfD5cbiAgICBkcGx5cjo6bXV0YXRlKFxuICAgICAgZXhjbHVkZXNfemVybyA9IChyZCAtIDEuOTYqc2UgPiAwKSB8IChyZCArIDEuOTYqc2UgPCAwKVxuICAgIClcbn0ifQ==
+eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoicnVuX2VmZmVjdF9zY2VuYXJpbyA8LSBmdW5jdGlvbihuLCBvcl9wcmVuYXRhbCwgbnNpbSA9IDEwMCkge1xuICBwdXJycjo6bWFwX2RmcigxOm5zaW0sIGZ1bmN0aW9uKGkpIHtcbiAgICBkYXQgPC0gZGdtKHNpbWlkID0gaSwgbiA9IG4sIG9yX3ByZW5hdGFsID0gb3JfcHJlbmF0YWwpXG5cbiAgICBmaXQgPC0gZ2xtKHByZXRlcm0gfiBwcmVuYXRhbCwgZGF0YSA9IGRhdCxcbiAgICAgICAgICAgICAgIHdlaWdodHMgPSBpcHcsIGZhbWlseSA9IHF1YXNpYmlub21pYWwobGluayA9IFwiaWRlbnRpdHlcIikpXG5cbiAgICBkcGx5cjo6dGliYmxlKFxuICAgICAgcmQgPSBjb2VmKGZpdClbMl0sXG4gICAgICBzZSA9IHNxcnQoZGlhZyhzYW5kd2ljaDo6dmNvdkhDKGZpdCkpKVsyXVxuICAgIClcbiAgfSkgfD5cbiAgICBkcGx5cjo6bXV0YXRlKFxuICAgICAgY2lfd2lkdGggPSAocmQgKyAxLjk2KnNlKSAtIChyZCAtIDEuOTYqc2UpLFxuICAgICAgZXhjbHVkZXNfemVybyA9IChyZCAtIDEuOTYqc2UgPiAwKSB8IChyZCArIDEuOTYqc2UgPCAwKVxuICAgIClcbn0ifQ==
 </script>
 </div>
-<p>We use the sandwich standard error directly here, since the previous section showed it’s the more trustworthy of the two.</p>
+<p>We use the sandwich standard error directly here, since we know it more accurately estimates the empirical standard error.</p>
+</section>
+<section id="translating-a-hypothesized-risk-difference-into-the-dgm" class="level3">
+<h3 class="anchored" data-anchor-id="translating-a-hypothesized-risk-difference-into-the-dgm">Translating a hypothesized risk difference into the DGM</h3>
+<p>Our DGM generates the treatment effect on the log-odds scale (<code>or_prenatal</code>), but the effect we actually want to hypothesize about is the marginal risk difference. So first we write down, analytically, the exact marginal risk difference implied by a given <code>or_prenatal</code> (no simulation noise, since <code>smoke</code> only takes two values), then invert that numerically to find the <code>or_prenatal</code> that produces whatever risk difference we want to hypothesize.</p>
+<div>
+<div id="webr-11" class="exercise-cell">
+
+</div>
+<script type="webr-11-contents">
+eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiaW1wbGllZF9yZCA8LSBmdW5jdGlvbihvcl9wcmVuYXRhbCwgb3Jfc21va2UgPSBsb2coMyksIHByb2Jfc21va2UgPSAwLjIsXG4gICAgICAgICAgICAgICAgICAgICAgICBwcm9iX3ByZW5hdGFsID0gYygwLjg1LCAwLjY1KSwgcHJvYl9wcmV0ZXJtID0gMC4xKSB7XG4gIHlfaW50ZXJjZXB0IDwtIGRlcml2ZV9pbnRlcmNlcHQocHkgPSBwcm9iX3ByZXRlcm0sIHByb2JfcHJlbmF0YWwgPSBwcm9iX3ByZW5hdGFsLFxuICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwcm9iX3Ntb2tlID0gcHJvYl9zbW9rZSwgb3Jfc21va2UgPSBvcl9zbW9rZSxcbiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb3JfcHJlbmF0YWwgPSBvcl9wcmVuYXRhbClcbiAgcF94MCA8LSAoMSAtIHByb2Jfc21va2UpICogZXhwaXQoeV9pbnRlcmNlcHQpICtcbiAgICBwcm9iX3Ntb2tlICogZXhwaXQoeV9pbnRlcmNlcHQgKyBvcl9zbW9rZSlcbiAgcF94MSA8LSAoMSAtIHByb2Jfc21va2UpICogZXhwaXQoeV9pbnRlcmNlcHQgKyBvcl9wcmVuYXRhbCkgK1xuICAgIHByb2Jfc21va2UgKiBleHBpdCh5X2ludGVyY2VwdCArIG9yX3Ntb2tlICsgb3JfcHJlbmF0YWwpXG4gIHBfeDEgLSBwX3gwXG59XG5cbm9yX3ByZW5hdGFsX2Zvcl9yZCA8LSBmdW5jdGlvbih0YXJnZXRfcmQpIHtcbiAgdW5pcm9vdChmdW5jdGlvbihsb3IpIGltcGxpZWRfcmQobG9yKSAtIHRhcmdldF9yZCwgaW50ZXJ2YWwgPSBsb2coYygwLjAwMSwgMTApKSkkcm9vdFxufSJ9
+</script>
+</div>
 </section>
 <section id="run-this-across-a-grid-of-hypothesized-effect-sizes-at-a-couple-of-fixed-sample-sizes" class="level3">
 <h3 class="anchored" data-anchor-id="run-this-across-a-grid-of-hypothesized-effect-sizes-at-a-couple-of-fixed-sample-sizes">Run this across a grid of hypothesized effect sizes, at a couple of fixed sample sizes</h3>
@@ -449,55 +464,40 @@ eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoicnVuX2VmZmVjdF9zY2VuYXJp
 <i class="callout-icon no-icon"></i>
 </div>
 <div class="callout-body-container">
-<p>The local (downloads) version compares N = 5,000 vs.&nbsp;N = 50,000, with 250 replicates at each of 6 hypothesized effect sizes. Here in the browser we compare N = 2,000 vs.&nbsp;N = 8,000, with 100 replicates at each of 5 effect sizes.</p>
+<p>The local (downloads) version compares N = 1,000 vs.&nbsp;N = 10,000, with 250 replicates at each of 6 hypothesized risk differences. Here in the browser we compare N = 1,000 vs.&nbsp;N = 4,000, with 100 replicates at each.</p>
 </div>
 </div>
 </div>
 <div>
-<div id="webr-11" class="exercise-cell">
+<div id="webr-12" class="exercise-cell">
 
 </div>
-<script type="webr-11-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiIyBUd28gZGF0YSBzb3VyY2VzIHdlIGRvbid0IGdldCB0byByZWRlc2lnbjogYSBtb2Rlc3Qgc2luZ2xlLXNpdGUgcmVnaXN0cnksXG4jIGFuZCBhIG11Y2ggbGFyZ2VyIGluc3VyYW5jZSBjbGFpbXMgZGF0YWJhc2UuXG5maXhlZF9uIDwtIGMoMjAwMCwgODAwMClcbm9yX2dyaWQgPC0gYygwLjUsIDAuNiwgMC43LCAwLjgsIDAuOSlcblxuZGV0ZWN0YWJsZV9lZmZlY3QgPC0gcHVycnI6Om1hcF9kZnIoZml4ZWRfbiwgZnVuY3Rpb24obikge1xuICBwdXJycjo6bWFwX2Rmcihvcl9ncmlkLCBmdW5jdGlvbihvcnApIHtcbiAgICByZXBzIDwtIHJ1bl9lZmZlY3Rfc2NlbmFyaW8obiwgb3JfcHJlbmF0YWwgPSBsb2cob3JwKSwgbnNpbSA9IDEwMClcbiAgICBkcGx5cjo6dGliYmxlKG4gPSBuLCBvciA9IG9ycCwgcG93ZXIgPSBtZWFuKHJlcHMkZXhjbHVkZXNfemVybykpXG4gIH0pXG59KVxuXG5kZXRlY3RhYmxlX2VmZmVjdCJ9
+<script type="webr-12-contents">
+eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiIyBUd28gZGF0YSBzb3VyY2VzIHdlIGRvbid0IGdldCB0byByZWRlc2lnbjogYSBtb2Rlc3Qgc2luZ2xlLXNpdGUgcmVnaXN0cnksXG4jIGFuZCBhIG11Y2ggbGFyZ2VyIGluc3VyYW5jZSBjbGFpbXMgZGF0YWJhc2UuXG5yZF9ncmlkIDwtIGMoLTAuMDEsIC0wLjAyLCAtMC4wMywgLTAuMDUsIC0wLjA3LCAtMC4xMClcbmZpeGVkX24gPC0gYygxMDAwLCA0MDAwKVxuXG5kZXRlY3RhYmxlX2VmZmVjdCA8LSBwdXJycjo6bWFwX2RmcihmaXhlZF9uLCBmdW5jdGlvbihuKSB7XG4gIHB1cnJyOjptYXBfZGZyKHJkX2dyaWQsIGZ1bmN0aW9uKHRhcmdldF9yZCkge1xuICAgIHJlcHMgPC0gcnVuX2VmZmVjdF9zY2VuYXJpbyhuLCBvcl9wcmVuYXRhbCA9IG9yX3ByZW5hdGFsX2Zvcl9yZCh0YXJnZXRfcmQpLCBuc2ltID0gMTAwKVxuICAgIGRwbHlyOjp0aWJibGUobiA9IG4sIHJkID0gdGFyZ2V0X3JkLCBwb3dlciA9IG1lYW4ocmVwcyRleGNsdWRlc196ZXJvKSlcbiAgfSlcbn0pXG5cbmRldGVjdGFibGVfZWZmZWN0In0=
 </script>
 </div>
 </section>
 <section id="plot-power-vs.-hypothesized-effect-size-by-sample-size" class="level3">
 <h3 class="anchored" data-anchor-id="plot-power-vs.-hypothesized-effect-size-by-sample-size">Plot: power vs.&nbsp;hypothesized effect size, by sample size</h3>
 <div>
-<div id="webr-12" class="exercise-cell">
+<div id="webr-13" class="exercise-cell">
 
 </div>
-<script type="webr-12-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiZ2dwbG90KGRldGVjdGFibGVfZWZmZWN0LCBhZXMoeCA9IG9yLCB5ID0gcG93ZXIsIGNvbG9yID0gZmFjdG9yKG4pKSkgK1xuICBnZW9tX2xpbmUoKSArXG4gIGdlb21fcG9pbnQoKSArXG4gIGdlb21faGxpbmUoeWludGVyY2VwdCA9IDAuOCwgbGluZXR5cGUgPSBcImRhc2hlZFwiKSArXG4gIHNjYWxlX3lfY29udGludW91cyhsaW1pdHMgPSBjKDAsIDEpKSArXG4gIHNjYWxlX2NvbG9yX21hbnVhbCh2YWx1ZXMgPSBjKFwiIzFiOWU3N1wiLCBcIiM3NTcwYjNcIiksXG4gICAgICAgICAgICAgICAgICAgICAgbGFiZWxzID0gZm9ybWF0KGZpeGVkX24sIGJpZy5tYXJrID0gXCIsXCIsIHNjaWVudGlmaWMgPSBGQUxTRSkpICtcbiAgdGhlbWVfbWluaW1hbCgpICtcbiAgbGFicyhcbiAgICB4ID0gXCJIeXBvdGhlc2l6ZWQgb2RkcyByYXRpbyAoc21hbGxlciA9IHN0cm9uZ2VyIGVmZmVjdClcIixcbiAgICB5ID0gXCJQcm9wb3J0aW9uIG9mIHNhbXBsZXMgd2hvc2UgOTUlIENJIGV4Y2x1ZGVzIHplcm9cIixcbiAgICBjb2xvciA9IFwiTlwiLFxuICAgIHRpdGxlID0gXCJXaGF0IGVmZmVjdCBzaXplcyBjb3VsZCB0aGlzIHN0dWR5IGFjdHVhbGx5IGRldGVjdD9cIixcbiAgICBzdWJ0aXRsZSA9IFwiV2Vha2VyIGVmZmVjdHMgKGNsb3NlciB0byBPUiA9IDEpIGJlY29tZSB1bmRldGVjdGFibGUgc29vbmVyIGF0IHNtYWxsZXIgTlwiXG4gICkifQ==
+<script type="webr-13-contents">
+eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiZ2dwbG90KGRldGVjdGFibGVfZWZmZWN0LCBhZXMoeCA9IHJkLCB5ID0gcG93ZXIsIGNvbG9yID0gZmFjdG9yKG4pKSkgK1xuICBnZW9tX2xpbmUoKSArXG4gIGdlb21fcG9pbnQoKSArXG4gIGdlb21faGxpbmUoeWludGVyY2VwdCA9IDAuOCwgbGluZXR5cGUgPSBcImRhc2hlZFwiKSArXG4gIHNjYWxlX3lfY29udGludW91cyhsaW1pdHMgPSBjKDAsIDEpKSArXG4gIHNjYWxlX2NvbG9yX21hbnVhbCh2YWx1ZXMgPSBjKFwiIzFiOWU3N1wiLCBcIiM3NTcwYjNcIiksXG4gICAgICAgICAgICAgICAgICAgICAgbGFiZWxzID0gZm9ybWF0KGZpeGVkX24sIGJpZy5tYXJrID0gXCIsXCIsIHNjaWVudGlmaWMgPSBGQUxTRSkpICtcbiAgdGhlbWVfbWluaW1hbCgpICtcbiAgbGFicyhcbiAgICB4ID0gXCJIeXBvdGhlc2l6ZWQgcmlzayBkaWZmZXJlbmNlIChtb3JlIG5lZ2F0aXZlID0gc3Ryb25nZXIgZWZmZWN0KVwiLFxuICAgIHkgPSBcIlByb3BvcnRpb24gb2Ygc2FtcGxlcyB3aG9zZSA5NSUgQ0kgZXhjbHVkZXMgemVyb1wiLFxuICAgIGNvbG9yID0gXCJOXCIsXG4gICAgdGl0bGUgPSBcIldoYXQgZWZmZWN0IHNpemVzIGNvdWxkIHRoaXMgc3R1ZHkgYWN0dWFsbHkgZGV0ZWN0P1wiLFxuICAgIHN1YnRpdGxlID0gXCJXZWFrZXIgZWZmZWN0cyAoY2xvc2VyIHRvIFJEID0gMCkgYmVjb21lIHVuZGV0ZWN0YWJsZSBzb29uZXIgYXQgc21hbGxlciBOXCJcbiAgKSJ9
 </script>
 </div>
 </section>
 <section id="the-minimum-detectable-effect-size-at-each-n" class="level3">
 <h3 class="anchored" data-anchor-id="the-minimum-detectable-effect-size-at-each-n">The minimum detectable effect size, at each N</h3>
 <div>
-<div id="webr-13" class="exercise-cell">
-
-</div>
-<script type="webr-13-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoibWRlcyA8LSBkZXRlY3RhYmxlX2VmZmVjdCB8PlxuICBkcGx5cjo6YXJyYW5nZShuLCBwb3dlcikgfD5cbiAgZHBseXI6OnN1bW1hcml6ZShcbiAgICBtaW5fZGV0ZWN0YWJsZV9vciA9IGFwcHJveCh4ID0gcG93ZXIsIHkgPSBvciwgeG91dCA9IDAuOCkkeSxcbiAgICAuYnkgPSBuXG4gIClcblxubWRlcyJ9
-</script>
-</div>
-<div>
 <div id="webr-14" class="exercise-cell">
 
 </div>
 <script type="webr-14-contents">
-eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWV9LCJjb2RlIjoiY2F0KFwiQXQgTiA9XCIsIGZvcm1hdChtZGVzJG5bMV0sIGJpZy5tYXJrID0gXCIsXCIpLCBcIndlIGNvdWxkIG9ubHkgcmVsaWFibHkgZGV0ZWN0IGFuIG9kZHMgcmF0aW8gYXQgb3IgYmVsb3cgYWJvdXRcIixcbiAgICByb3VuZChtZGVzJG1pbl9kZXRlY3RhYmxlX29yWzFdLCAyKSwgXCJcXG5cIilcbmNhdChcIkF0IE4gPVwiLCBmb3JtYXQobWRlcyRuWzJdLCBiaWcubWFyayA9IFwiLFwiKSwgXCJ0aGF0IGltcHJvdmVzIHRvIGFib3V0XCIsXG4gICAgcm91bmQobWRlcyRtaW5fZGV0ZWN0YWJsZV9vclsyXSwgMiksIFwiXFxuXCIpIn0=
+eyJhdHRyIjp7ImVkaXQiOnRydWUsImV2YWwiOnRydWUsIndhcm5pbmciOmZhbHNlfSwiY29kZSI6Im1kZXMgPC0gZGV0ZWN0YWJsZV9lZmZlY3QgfD5cbiAgZHBseXI6OmFycmFuZ2UobiwgcG93ZXIpIHw+XG4gIGRwbHlyOjpzdW1tYXJpemUoXG4gICAgbWluX2RldGVjdGFibGVfcmQgPSBhcHByb3goeCA9IHBvd2VyLCB5ID0gcmQsIHhvdXQgPSAwLjgpJHksXG4gICAgLmJ5ID0gblxuICApXG5cbm1kZXMifQ==
 </script>
 </div>
-<p>This is exactly the question a study built on secondary data should ask <em>before</em> committing to it: given the N the data source hands you, is the effect you actually care about even detectable?</p>
-<p><strong>Try it yourself:</strong></p>
-<ul>
-<li>What would be the sample size for 80% power if there was no relationship between smoking and treatment?</li>
-<li>What would be the impact to sample size if we had to incorporate another nuisance model: e.g., to correct for exposure misclassification? How could we incorporate in the simulation?</li>
-<li>How does the minimum detectable effect size change if the outcome (preterm birth) is rarer, e.g.&nbsp;<code>prob_preterm = 0.03</code> instead of 0.1? Does a rarer outcome make weaker effects harder or easier to detect at the same N?</li>
-</ul>
 
 
 <script type="webr-data">
