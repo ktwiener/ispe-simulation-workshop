@@ -19,6 +19,8 @@ Luckily, we can adapt the code we wrote for one sample.
 Install the required packages.
 
 ```{r}
+#| message: false
+#| warning: false
 library(dplyr)
 library(purrr)
 library(ggplot2)

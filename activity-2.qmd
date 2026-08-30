@@ -14,7 +14,7 @@ webr:
 ---
 
 ::: {.callout-note appearance="minimal"}
-**Prefer to work locally?** [Download the local version](downloads/activity-2.qmd){download="activity-2.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render`. The local version uses more replicates (1,000 vs. 500 here) for a more precise estimate of bias and coverage — the browser version is scaled down so it runs in well under a minute.
+**Prefer to work locally?** [Download the local version](downloads/activity-2.qmd){download="activity-2.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render` — or a [PDF](downloads/activity-2.pdf) with the code and output already rendered. The local version uses more replicates (1,000 vs. 500 here) for a more precise estimate of bias and coverage — the browser version is scaled down so it runs in well under a minute.
 :::
 
 # One Thousand Random Samples from the Data Generating Mechanism

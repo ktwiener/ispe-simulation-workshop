@@ -8,17 +8,21 @@ format: html
 
 # Using simulations to plan a study
 
-Simulation isn't only useful for evaluating a method after data are in hand — it's also useful *before* a single participant is enrolled. If we can write down a plausible data generating mechanism (DGM) for our study, we can use it to ask design questions: If our hypothesized effect is real, how precisely will we estimate it, and how often will a single study actually show a clear difference, at a given sample size?
+If we can posit a plausible data generating mechanism (DGM) for our study, we can use it to ask design questions.
 
-That question runs in two directions, and both come up in practice. If we're designing a prospective study, we usually get to ask "given the effect I hypothesize, how large a sample do I need?" But when we're reusing an existing data source — a claims database, a disease registry — the sample size is fixed by the data, not by us, and the useful question flips: "given the N I have, what's the smallest effect I could realistically detect?"
+When designing a prospective study, we typically ask "given the effect I hypothesize, how large a sample do I need?" 
 
-In this activity we revisit the prenatal vitamins / preterm birth / smoking example from Activities 1–2. Let's assume the effect is stronger (OR = 0.8) and use repeated simulation to see how precision (ASE, ESE) and our ability to detect a clear difference (power) change as sample size grows, and what the resulting confidence intervals actually look like. Then we'll turn the question around and ask what effect sizes are detectable at a couple of fixed, realistic sample sizes.
+But when we're using secondary data — a claims database, a disease registry — the sample size is set by the data. 
+
+In this activity we revisit the prenatal vitamins / preterm birth / smoking example from Activities 1–2. We make the effect stronger (OR = 0.8) and use simulation to see how precision (ASE, ESE) and our ability to detect a clear difference (power) change as sample size grows, and what the resulting confidence intervals look like. Then we'll turn the question around and ask what effect sizes are detectable at a fixed sample size.
 
 ## Before you begin
 
 Install the required packages.
 
 ```{r}
+#| message: false
+#| warning: false
 library(dplyr)
 library(tidyr)
 library(purrr)
@@ -129,7 +133,7 @@ set.seed(918273)
 
 ### The hypothesized effect
 
-Study planning happens *before* we have data, so instead of an empirical "truth" recovered from a huge dataset, we plug in our best guess (from prior literature, pilot data, or clinical judgment) for each DGM parameter. We can still generate one very large sample under those hypothesized parameters just to confirm what marginal risk difference they imply.
+Study planning mainly *before* we have data, so instead of an empirical "truth" recovered from a huge dataset, we plug in our best guess (from prior literature, pilot data, or clinical judgment) for each DGM parameter. We can still generate one very large sample under those hypothesized parameters just to confirm what marginal risk difference they imply.
 
 ```{r}
 truth <- dgm(n = 10000000)
@@ -137,7 +141,7 @@ true_rd <- mean(truth$preterm_x1) - mean(truth$preterm_x0)
 true_rd
 ```
 
-Notice this is a small effect — about a 1-percentage-point absolute reduction in preterm birth risk. Small, plausible drug effects like this are common in pharmacoepidemiology, and (as we'll see) they demand large studies.
+Notice this is a small effect — about a 2-percentage-point absolute reduction in preterm birth risk. Small, plausible drug effects like this are common in pharmacoepidemiology, and (as we'll see) they demand large studies.
 
 ## Step 3. Define the estimand of the analysis.
 
@@ -269,11 +273,13 @@ results_by_n |>
   )
 ```
 
-## Turning the question around: what effect could I detect with the data I have?
+## What effect could I detect with the data I have?
 
-So far we've asked: "given a hypothesized effect, how big a sample do I need?" But a lot of pharmacoepidemiology works in the other direction — we're reusing an existing data source (an insurance claims database, a disease registry) whose size we don't get to choose. The useful planning question becomes: "given the N I'm stuck with, what's the smallest effect I could realistically detect?"
+So far we've asked: "given a hypothesized effect, how big a sample do I need?" But in pharmacoepidemiology we're typically using an existing data source (an insurance claims database, a disease registry). The useful planning question becomes: "given the N in this data source (and my design choices), what's the smallest effect I could realistically detect?"
 
-We can answer this with the exact same simulation machinery, just swapping which quantity is fixed and which one varies. Instead of looping over N at one hypothesized effect, we now fix N at a couple of realistic values and loop over a grid of hypothesized effect sizes.
+We can answer this with the exact same simulation machinery, just swapping which quantity is fixed and which one varies. 
+
+Instead of looping over N at one hypothesized effect, we now fix N and loop over a grid of hypothesized effect sizes. We can also change the confounding parameters to see how that impacts our precision. 
 
 ### Function to simulate one effect-size scenario
 
@@ -291,36 +297,58 @@ run_effect_scenario <- function(n, or_prenatal, nsim = 250) {
     )
   }) |>
     dplyr::mutate(
+      ci_width = (rd + 1.96*se) - (rd - 1.96*se),
       excludes_zero = (rd - 1.96*se > 0) | (rd + 1.96*se < 0)
     )
 }
 ```
 
-We use the sandwich standard error directly here, since the previous section showed it tracks the empirical standard error more closely than the model-based one.
+We use the sandwich standard error directly here, since we know it more accurately estimates the empirical standard error. 
+
+### Translating a hypothesized risk difference into the DGM
+
+Our DGM generates the treatment effect on the log-odds scale (`or_prenatal`), but the effect we actually want to hypothesize about is the marginal risk difference. So first we write down, analytically, the exact marginal risk difference implied by a given `or_prenatal` (no simulation noise, since `smoke` only takes two values), then invert that numerically to find the `or_prenatal` that produces whatever risk difference we want to hypothesize.
+
+```{r}
+implied_rd <- function(or_prenatal, or_smoke = log(3), prob_smoke = 0.2,
+                        prob_prenatal = c(0.85, 0.65), prob_preterm = 0.1) {
+  y_intercept <- derive_intercept(py = prob_preterm, prob_prenatal = prob_prenatal,
+                                   prob_smoke = prob_smoke, or_smoke = or_smoke,
+                                   or_prenatal = or_prenatal)
+  p_x0 <- (1 - prob_smoke) * expit(y_intercept) +
+    prob_smoke * expit(y_intercept + or_smoke)
+  p_x1 <- (1 - prob_smoke) * expit(y_intercept + or_prenatal) +
+    prob_smoke * expit(y_intercept + or_smoke + or_prenatal)
+  p_x1 - p_x0
+}
+
+or_prenatal_for_rd <- function(target_rd) {
+  uniroot(function(lor) implied_rd(lor) - target_rd, interval = log(c(0.001, 10)))$root
+}
+```
 
 ### Run this across a grid of hypothesized effect sizes, at a couple of fixed sample sizes
 
 ```{r}
 # Two data sources we don't get to redesign: a modest single-site registry,
 # and a much larger insurance claims database.
-fixed_n <- c(5000, 50000)
-or_grid <- c(0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
-
+rd_grid <- c(-0.01, -0.02, -0.03, -0.05, -0.07, -0.10)
+fixed_n <- c(1000, 10000)
 detectable_effect <- purrr::map_dfr(fixed_n, function(n) {
-  purrr::map_dfr(or_grid, function(orp) {
-    reps <- run_effect_scenario(n, or_prenatal = log(orp), nsim = 250)
-    dplyr::tibble(n = n, or = orp, power = mean(reps$excludes_zero))
+  purrr::map_dfr(rd_grid, function(target_rd) {
+    reps <- run_effect_scenario(n, or_prenatal = or_prenatal_for_rd(target_rd), nsim = 250)
+    dplyr::tibble(n = n, rd = target_rd, power = mean(reps$excludes_zero))
   })
 })
 
 detectable_effect |>
-  kableExtra::kable(col.names = c("N", "Hypothesized OR", "Power"), digits = 3)
+  kableExtra::kable(col.names = c("N", "Hypothesized risk difference", "Power"), digits = 3)
 ```
 
 ### Plot: power vs. hypothesized effect size, by sample size
 
 ```{r}
-ggplot(detectable_effect, aes(x = or, y = power, color = factor(n))) +
+ggplot(detectable_effect, aes(x = rd, y = power, color = factor(n))) +
   geom_line() +
   geom_point() +
   geom_hline(yintercept = 0.8, linetype = "dashed") +
@@ -328,11 +356,11 @@ ggplot(detectable_effect, aes(x = or, y = power, color = factor(n))) +
   scale_color_manual(values = c("#1b9e77", "#7570b3"), labels = scales::comma(fixed_n)) +
   theme_minimal() +
   labs(
-    x = "Hypothesized odds ratio (smaller = stronger effect)",
+    x = "Hypothesized risk difference (more negative = stronger effect)",
     y = "Proportion of samples whose 95% CI excludes zero",
     color = "N",
     title = "What effect sizes could this study actually detect?",
-    subtitle = "Weaker effects (closer to OR = 1) become undetectable sooner at smaller N"
+    subtitle = "Weaker effects (closer to RD = 0) become undetectable sooner at smaller N"
   )
 ```
 
@@ -343,18 +371,13 @@ ggplot(detectable_effect, aes(x = or, y = power, color = factor(n))) +
 mdes <- detectable_effect |>
   dplyr::arrange(n, power) |>
   dplyr::summarize(
-    min_detectable_or = approx(x = power, y = or, xout = 0.8)$y,
+    min_detectable_rd = approx(x = power, y = rd, xout = 0.8)$y,
     .by = n
   )
 
 mdes |>
-  kableExtra::kable(col.names = c("N", "Smallest detectable OR (80% power)"), digits = 2)
+  kableExtra::kable(col.names = c("N", "Smallest detectable risk difference (80% power)"), digits = 3)
 ```
 
-At N = `r scales::comma(mdes$n[mdes$n == 5000])` — a plausible single-site registry — we could only reliably detect an odds ratio at or below about `r round(mdes$min_detectable_or[mdes$n == 5000], 2)`. At N = `r scales::comma(mdes$n[mdes$n == 50000])` — more like a claims database — that improves to about `r round(mdes$min_detectable_or[mdes$n == 50000], 2)`. This is exactly the question a study built on secondary data should ask *before* committing to it: given the N the data source hands you, is the effect you actually care about even detectable?
 
-**Try it yourself:**
 
-- What would be the sample size for 80% power if there was no relationship between smoking and treatment?
-- What would be the impact to sample size if we had to incorporate another nuisance model: e.g., to correct for exposure misclassification? How could we incorporate in the simulation?
-- How does the minimum detectable effect size change if the outcome (preterm birth) is rarer, e.g. `prob_preterm = 0.03` instead of 0.1? Does a rarer outcome make weaker effects harder or easier to detect at the same N?

@@ -12,7 +12,7 @@ webr:
 ---
 
 ::: {.callout-note appearance="minimal"}
-**Prefer to work locally?** [Download the local version](downloads/activity-1.qmd){download="activity-1.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render`. The local version uses a sample of 10,000,000 to estimate bias — the browser version is scaled down to 2,000,000 so it runs quickly here.
+**Prefer to work locally?** [Download the local version](downloads/activity-1.qmd){download="activity-1.qmd"} — a standard `.qmd` file with regular R chunks you can run in RStudio or with `quarto render` — or a [PDF](downloads/activity-1.pdf) with the code and output already rendered. The local version uses a sample of 10,000,000 to estimate bias — the browser version is scaled down to 2,000,000 so it runs quickly here.
 :::
 
 **In this activity, we illustrate the key steps first for one single random sample from the data generating mechanism (DGM). Activity 2 will adapt this for 1,000 random samples.**
