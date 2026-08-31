@@ -58,7 +58,7 @@ Mapped onto ADEMP, the running example looks like this:
 ## Table 6. Performance measures: definitions, estimates, and Monte Carlo standard errors from Morris et al. (2017)
 ```{r}
 #| echo: false
-#| out-width: "70%"
+#| out-width: "100%"
 #| fig-align: center
 knitr::include_graphics("figures/morris_table.png")
 ```
