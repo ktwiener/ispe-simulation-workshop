@@ -5,7 +5,7 @@ subtitle: "Designing and conducting simulation studies for causal inference meth
 
 ## About This Workshop
 
-This workshop covers how to design, implement, and evaluate a Monte Carlo simulation study for a causal inference problem — using confounding by an unmeasured variable, inverse probability of treatment weighting (IPTW), and standard error estimation as a running example.
+This workshop covers how to design, implement, and evaluate a Monte Carlo simulation study — using confounding by an unmeasured variable, inverse probability of treatment weighting (IPTW), and standard error estimation as a running example.
 
 Topics include:
 

@@ -5,7 +5,7 @@ toc: true
 
 # Why Simulate?
 
-Analytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when we have to deal with multiple nuisance models (e.g., propensity score, missing data, measurement error correction). Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we — as the analyst — know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.
+Analytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when we have to deal with multiple nuisance models (e.g., propensity score, missing data, measurement error correction). Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.
 
 Simulation is useful whenever you need to:
 
@@ -26,13 +26,11 @@ Throughout this workshop we plan every simulation study using the **ADEMP** fram
 | **M** | Methods | Which estimator(s) will we apply to the simulated data? |
 | **P** | Performance measures | How will we judge whether a method worked well? |
 
-Working through the activities on this site, you will see each of these steps made explicit — first for a single simulated sample (Activity 1), then scaled up to thousands of replicates so the sampling-based performance measures can be evaluated (Activity 2).
-
 # The Running Example
 
 **Clinical question:** Does taking prenatal vitamins during pregnancy reduce the risk of preterm birth?
 
-**The complication:** We're worried about confounding by maternal smoking. Smoking is associated with *lower* use of prenatal vitamins and a *higher* risk of preterm birth — but suppose smoking status isn't recorded in our data, so we can't adjust for it directly.
+**The complication:** We're worried about confounding by maternal smoking. Smoking is associated with *lower* use of prenatal vitamins and a *higher* risk of preterm birth.
 
 ```{r}
 #| echo: false
@@ -49,12 +47,11 @@ Mapped onto ADEMP, the running example looks like this:
 
 2. Compare approaches (naive, robust) to standard error estimation.
 
+3. (Bonus): Planning sample size or understanding precision at a fixed sample size. 
+
 
 - **Data-generating mechanism** — Simulate smoking status, both potential outcomes for preterm birth (with and without vitamins), observed vitamin use conditional on smoking, and the observed outcome — see Activity 1.
 - **Estimand** — The marginal risk difference, $E[Y^{x=1}] - E[Y^{x=0}]$: the risk of preterm birth had *everyone* taken prenatal vitamins vs. had *no one* taken them.
 - **Methods** — An unadjusted risk difference, and inverse probability of treatment weighted (IPTW) risk differences using the known treatment weights — see Activities 1–2.
 - **Performance measures** — Bias (Activity 1), and average model-based vs. sandwich standard errors (Activity 2).
 
-# Next Steps
-
-Head to **Activity 1** to build the data-generating mechanism for a single simulated sample.

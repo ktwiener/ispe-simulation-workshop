@@ -131,7 +131,7 @@ set.seed(57846)
 First, create a large re-sampled dataset from which to derive the truth. By doing this after setting the seed, we ensure that we use the same random state start and thus do not overlap with random states from the "observed" data. See Morris et al. (2019) for additional detail on this.
 
 ::: {.callout-tip appearance="minimal"}
-The local (downloads) version uses a 10,000,000-person sample for the truth. Here in the browser we use 2,000,000 — still large enough for a very precise Monte Carlo estimate of the true risk difference, but much faster to generate in webR.
+The local (downloads) version uses a 10,000,000-person sample for the truth. Here in the browser we use 2,000,000 — much faster to generate in webR.
 :::
 
 ```{webr}
@@ -144,12 +144,12 @@ truth <- dgm(n = 2000000, prob_prenatal = c(0.85, 0.65), or_smoke = log(3))
 Now we want to re-sample from this DGM many times to understand the sampling behavior of our estimators. Note that we are *not* resetting the seed with each iteration. See Morris et al. (2019) for additional detail.
 
 ::: {.callout-tip appearance="minimal"}
-The local (downloads) version uses 10,000 replicates. Here in the browser we use 500, which is enough to see the qualitative pattern in bias and coverage, though the estimates will look noisier — a good illustration of Monte Carlo error in its own right!
+The local (downloads) version uses 1,000 replicates. Here in the browser we use 500, which is enough to see the qualitative pattern in bias and coverage, though the estimates will look noisier.
 :::
 
 ```{webr}
 # Randomly sample 500 datasets of 500 people for the analysis
-data1000 <- purrr::map(.x = 1:500, dgm, n = 500, prob_prenatal = c(0.85, 0.65), or_smoke = log(3))
+data500 <- purrr::map(.x = 1:500, dgm, n = 500, prob_prenatal = c(0.85, 0.65), or_smoke = log(3))
 ```
 
 ## Step 3. Define the estimand of the analysis.
@@ -187,10 +187,10 @@ Within the weighted risk difference, we are further comparing two approaches for
 
 ### Add IPT weights to the samples
 
-We add the "known" treatment weight to each sample — known because we set the true treatment-assignment probabilities for the simulation. In a real observational study we wouldn't know these; we'd have to estimate a propensity score and construct weights from that instead.
+We add the "known" treatment weight to each sample — known because we set the true treatment-assignment probabilities for the simulation. In a real observational study we wouldn't know these; we'd have to estimate instead.
 
 ```{webr}
-data1000 <- purrr::map(data1000,
+data500 <- purrr::map(data500,
                        function(x){
                          x |>
                            dplyr::mutate(
@@ -210,9 +210,7 @@ data1000 <- purrr::map(data1000,
 Within each sample, we want to estimate the unadjusted risk difference and the weighted risk difference and their associated model-based standard errors. Additionally, for the *weighted* risk difference we will estimate the robust sandwich standard errors to account for the weights.
 
 ```{webr}
-rds_ses <- purrr::map_dfr(
-  data1000,
-  function(x){
+analyze_each_sim <- function(x){
     unadj <- glm(preterm ~ prenatal, data = x, family = binomial(link = "identity"))
     adj_known <- glm(preterm ~ prenatal, data = x,
                  weights = ipw, family = quasibinomial(link = "identity"))
@@ -231,9 +229,13 @@ rds_ses <- purrr::map_dfr(
              sqrt(diag(vcov(adj_known)))[2],
              sqrt(diag(sandwich::vcovHC(adj_known)))[2])
     )
-  }
-) |>
-  dplyr::select(estimator, r0, r1, rd, se)
+}
+
+# loop over each sample and apply the analysis
+rds_ses <- purrr::map_dfr(
+  data500,
+  analyze_each_sim
+)
 ```
 
 ## Step 5: Performance measures
@@ -345,4 +347,52 @@ rds_ses |>
        subtitle = "Blue = interval contains the true risk difference")
 ```
 
-Is coverage at (or near) the nominal 95% for both SE approaches, or does one look conservative (coverage above 95%) while the other looks anticonservative (coverage below 95%)? Try re-running the resampling chunk with more replicates — how much does the coverage estimate itself move around?
+## When things go wrong
+
+If we have parameters close to the edge of the parameter space (e.g., rare exposure, rare outcome), we can run into issues with model convergence in some of the samples.
+
+We can set up our simulation code defensively to collect when a simulation fails and keep going, rather than failing and stopping the program altogether.
+
+For example, let's make the comparator more rare (i.e., more people taking prenatal vitamins)
+
+::: {.callout-tip appearance="minimal"}
+The local (downloads) version uses 1,000 replicates here too. Here in the browser we use 500 to keep things fast.
+:::
+
+```{webr}
+data_error <- purrr::map(
+  .x = 1:500,
+  dgm,
+  n = 500,
+  prob_prenatal = c(0.95, 0.85),
+  prob_smoke = 0.1)
+
+rds_ses_error <- purrr::map(
+  data_error,
+  function(x){
+    x <- x |>
+      dplyr::mutate(
+       # Known weight: numerator is the marginal probability
+       # of treatment, denominator is the probability of the
+       # observed treatment given smoking
+       ipw = if_else(prenatal == 1,
+                     p_prenatal_margin/p_prenatal,
+                     p_prenatal_margin/(1-p_prenatal))
+       )
+
+    tryCatch(
+      analyze_each_sim(x), # same function as above, just wrapped in a tryCatch
+      error = function(e){
+        return(paste0("Error in simulation: ", e$message))
+      }
+    )
+  }
+)
+
+idx <- which(purrr::map_lgl(rds_ses_error, is.character))
+idx
+```
+
+The simulation failed at the indexes printed above. We can now see why our simulation failed because we saved the error messages. When estimating our performance measures or calculating Monte-Carlo error, we will need to take into account that our actual number of successful simulations is smaller.
+
+
