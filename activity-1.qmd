@@ -8,7 +8,6 @@ webr:
   show-startup-message: false
   packages:
     - dplyr
-    - purrr
 ---
 
 ::: {.callout-note appearance="minimal"}
@@ -23,14 +22,17 @@ The packages below are pre-installed for this page. Run this chunk to load them 
 
 ```{webr}
 library(dplyr)
-library(purrr)
 ```
 
 ## Step 1. Outline the specific aims.
 
 **Context:** We want to estimate the effect of prenatal vitamin supplementation on the risk of preterm birth. However, we are worried about confounding by maternal smoking, which is not measured in our data.
 
-**Simulation Objective:** Quantify the magnitude and direction of bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth.
+**Simulation Objectives:**
+
+1. **Quantify the magnitude and direction of bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth (Activity 1).**
+
+2. Compare the 95% confidence interval coverage for the risk difference using different approaches to standard error estimation, including model-based SEs and sandwich SEs (Activity 2).
 
 ## Step 2. The DGM.
 
@@ -46,20 +48,26 @@ Simulations use random numbers to stand in for uncertainty / variability. We can
 - approximate things that are hard to solve analytically
   - can't use exact math? simulate!
   - we do this when want to know the "truth"
-- test statistical methods
+- testing statistical methods
   - see how well a test or estimator performs (bias, standard error, coverage)
-- bootstrap!
+- bootstrapping!
   - uses random resampling to estimate uncertainty
 
 **2. How does R generate random numbers?**
 
-Computers can't generate truly random numbers. R uses a "pseudo-random number generator" — an algorithm that produces a seemingly random sequence of numbers but is fully determined by a starting value (the "seed"). The generator will not repeat for a long time, and for our purposes is random enough.
+Computers aren't an early 2000s middle schooler ("so random") and can't generate truly random numbers.
+
+R uses a "pseudo-random number generator". It's an algorithm that produces a seemingly random sequence of numbers but is fully determined by a starting value (the "seed").
+
+The generator will not repeat for a long time, and for our purposes is random enough.
 
 **3. What are we doing when we set the seed?**
 
-When we set the seed, we are telling R where to start in the pseudo-random number sequence. This allows us to replicate our results in other R sessions. If we don't set the seed, the pseudo-RNG uses the system clock and process ID, so results will differ every session.
+When we set the seed, we are telling R where to start in the pseudo-random number sequence. This allows us to replicate our results in other R instances.
 
-**4. Why do we care about setting the seed?**
+If we don't set the seed, the pseudo RNG uses the system clock and process ID, so results will differ every session.
+
+**4. WHY do we care about setting the seed?**
 
 For reproducibility!
 
@@ -80,7 +88,9 @@ rnorm(5)
 # The same numbers, hopefully!
 ```
 
-Now let's set the seed for the rest of the simulation. Do this **before any random number generation**.
+Now let's set the seed for the rest of the simulation.
+
+Do this **before any random number generation**.
 
 ```{webr}
 set.seed(293857)
