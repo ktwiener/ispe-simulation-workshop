@@ -195,7 +195,6 @@ window.Quarto = {
   <li><a href="#why-simulate" id="toc-why-simulate" class="nav-link active" data-scroll-target="#why-simulate">Why Simulate?</a></li>
   <li><a href="#the-ademp-framework" id="toc-the-ademp-framework" class="nav-link" data-scroll-target="#the-ademp-framework">The ADEMP Framework</a></li>
   <li><a href="#the-running-example" id="toc-the-running-example" class="nav-link" data-scroll-target="#the-running-example">The Running Example</a></li>
-  <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">Next Steps</a></li>
   </ul>
 </nav>
     </div>
@@ -223,7 +222,7 @@ window.Quarto = {
 
 <section id="why-simulate" class="level1">
 <h1>Why Simulate?</h1>
-<p>Analytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when we have to deal with multiple nuisance models (e.g., propensity score, missing data, measurement error correction). Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we — as the analyst — know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.</p>
+<p>Analytic derivations can tell us the large-sample properties of an estimator, but they rarely tell us how that estimator behaves at a realistic sample size, under model misspecification, or when we have to deal with multiple nuisance models (e.g., propensity score, missing data, measurement error correction). Monte Carlo simulation fills that gap: we specify a data-generating mechanism (DGM) for which we know the truth, generate many random samples from it, apply the method(s) we want to evaluate, and compare the results back to the known truth.</p>
 <p>Simulation is useful whenever you need to:</p>
 <ul>
 <li>Model real-world random error and sampling variability</li>
@@ -276,12 +275,11 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<p>Working through the activities on this site, you will see each of these steps made explicit — first for a single simulated sample (Activity 1), then scaled up to thousands of replicates so the sampling-based performance measures can be evaluated (Activity 2).</p>
 </section>
 <section id="the-running-example" class="level1">
 <h1>The Running Example</h1>
 <p><strong>Clinical question:</strong> Does taking prenatal vitamins during pregnancy reduce the risk of preterm birth?</p>
-<p><strong>The complication:</strong> We’re worried about confounding by maternal smoking. Smoking is associated with <em>lower</em> use of prenatal vitamins and a <em>higher</em> risk of preterm birth — but suppose smoking status isn’t recorded in our data, so we can’t adjust for it directly.</p>
+<p><strong>The complication:</strong> We’re worried about confounding by maternal smoking. Smoking is associated with <em>lower</em> use of prenatal vitamins and a <em>higher</em> risk of preterm birth.</p>
 <div class="cell" data-layout-align="center">
 <div class="cell-output-display">
 <div class="quarto-figure quarto-figure-center">
@@ -298,6 +296,7 @@ window.Quarto = {
 <ol type="1">
 <li><p>Quantify the bias in the estimated effect of prenatal vitamins on preterm birth when maternal smoking confounds the relationship but is unaccounted for in the analysis.</p></li>
 <li><p>Compare approaches (naive, robust) to standard error estimation.</p></li>
+<li><p>(Bonus): Planning sample size or understanding precision at a fixed sample size.</p></li>
 </ol>
 <ul>
 <li><strong>Data-generating mechanism</strong> — Simulate smoking status, both potential outcomes for preterm birth (with and without vitamins), observed vitamin use conditional on smoking, and the observed outcome — see Activity 1.</li>
@@ -305,10 +304,6 @@ window.Quarto = {
 <li><strong>Methods</strong> — An unadjusted risk difference, and inverse probability of treatment weighted (IPTW) risk differences using the known treatment weights — see Activities 1–2.</li>
 <li><strong>Performance measures</strong> — Bias (Activity 1), and average model-based vs.&nbsp;sandwich standard errors (Activity 2).</li>
 </ul>
-</section>
-<section id="next-steps" class="level1">
-<h1>Next Steps</h1>
-<p>Head to <strong>Activity 1</strong> to build the data-generating mechanism for a single simulated sample.</p>
 
 
 </section>
