@@ -101,10 +101,6 @@ set.seed(293857)
 
 Next, we set our simulation parameters based on the prenatal example. Setting them up as variables let's us change them easily and sets us up for success for creating a function.
 
-Recall our DAG:
-
-![](../figures/dgm_dag.png){fig-align="center"}
-
 ```{r}
 n <- 10000000 # large sample size, so we can estimate bias directly (see Step 5)
 prob_smoke <- 0.2 # probability of Z = 1 (smoking)
