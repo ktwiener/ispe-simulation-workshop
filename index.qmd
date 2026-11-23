@@ -1,6 +1,5 @@
 ---
 title: "ISPE 2026 Simulation Workshop"
-subtitle: "Designing and conducting simulation studies for causal inference methods"
 ---
 
 ## About This Workshop
