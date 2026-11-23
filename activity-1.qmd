@@ -30,7 +30,7 @@ library(dplyr)
 
 **Simulation Objectives:**
 
-1. **Quantify the magnitude and direction of bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth (Activity 1).**
+1. **Quantify the magnitude and direction of the large-sample (asymptotic) bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth, and verify that the IPW estimator recovers the true effect (Activity 1).**
 
 2. Compare the 95% confidence interval coverage for the risk difference using different approaches to standard error estimation, including model-based SEs and sandwich SEs (Activity 2).
 
@@ -279,7 +279,14 @@ We have determined that we are interested in bias as a performance measure.
 
 For each sample, bias is equivalent to $\hat{\theta}-\theta$, where $\theta$ is the true risk difference.
 
-For multiple samples, $Bias = E[\hat{\theta}] - \theta$. If we are *only* interested in bias, we don't necessarily need to generate a bunch of repeated samples — we can just take one large sample and compare the unweighted and weighted estimates to the truth. Note this is not true for all scenarios: here our estimators converge to a true value as $n$ grows large, are linear (risk difference), and we are not exploring issues with finite sample bias.
+For multiple samples, $Bias = E[\hat{\theta}] - \theta$. If we are *only* interested in systematic (large-sample) bias, we don't necessarily need to generate a bunch of repeated samples — we can just take one very large sample and compare the unweighted and weighted estimates to the truth. With $n$ this large, $\hat{\theta}$ is essentially at its probability limit, so $\hat{\theta} - \theta$ approximates the **asymptotic bias**.
+
+This tells us two things:
+
+- For the **unweighted** estimator, it quantifies the bias due to confounding by smoking — a bias that does not go away as $n$ grows.
+- For the **IPW** estimator, a bias near zero is a check that the estimator is consistent for $\theta$, i.e., that our code and our estimator are targeting the estimand we think they are. This kind of large-sample check is a useful verification step before running a full simulation.
+
+What one large sample does *not* tell us is the finite-sample bias at realistic sample sizes, which requires repeated samples at a realistic $n$ (Activity 2). Strictly demonstrating consistency would also require showing that $\hat{\theta}$ converges to $\theta$ across increasing values of $n$, rather than a single $n$.
 
 Using our large sample and potential outcomes we already generated, we can determine the "truth" to use for estimating bias. We could also do this mathematically, since this is a simple example — see the appendix of the slides.
 

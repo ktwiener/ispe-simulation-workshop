@@ -40,7 +40,7 @@ library(sandwich)
 
 **Simulation Objectives:**
 
-1. Quantify the magnitude and direction of bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth (Activity 1).
+1. Quantify the magnitude and direction of the large-sample (asymptotic) bias in our estimate of the effect of prenatal vitamins on the risk of preterm birth under scenarios where maternal smoking decreases the use of prenatal vitamins but increases the risk of preterm birth, and verify that the IPW estimator recovers the true effect (Activity 1).
 
 2. **Compare the 95% confidence interval coverage for the risk difference using different approaches to standard error estimation, including model-based SEs and sandwich SEs (Activity 2).**
 
